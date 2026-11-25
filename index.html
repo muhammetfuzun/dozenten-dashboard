@@ -77,6 +77,20 @@ details summary{cursor:pointer;font-weight:700;padding:8px 0}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 18px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:10}
 .toast.show{opacity:1}
 pre,.scroll{overflow-x:auto}
+.ek{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:4px}
+.ek div{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ek b{display:block;font:700 22px/1.2 "Red Hat Display",system-ui,sans-serif}.ek span{font-size:13px;color:var(--mute)}
+.chart{position:relative;overflow-x:auto;padding-top:34px;margin-top:-34px}
+.chart svg{display:block;width:100%;height:auto;margin:0}
+.cg{stroke:var(--line);stroke-width:1}.cx{fill:var(--mute);font:12px "Red Hat Text",system-ui,sans-serif}
+.cv{fill:var(--ink);font:700 12px "Red Hat Text",system-ui,sans-serif}
+.cb{fill:var(--acc)}.cb.dim{fill-opacity:.55}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .cb.dim{fill-opacity:.7}}.bg{outline:none;cursor:default}.bg:hover .cb,.bg:focus .cb{fill:var(--ok);fill-opacity:1}
+.hit{fill:transparent}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--panel);padding:6px 11px;border-radius:8px;font-size:12.5px;transform:translate(-50%,-100%);white-space:nowrap;z-index:2;display:flex;flex-direction:column;gap:1px}
+.tip[hidden]{display:none}.tip b{font-size:15px}
+.tv{margin-top:10px}.tv table{max-width:460px}
+@media(forced-colors:active){.cb{fill:Highlight}}
 .paper{max-width:800px;margin:0 auto;background:#fff;color:#1c2430;border-radius:6px;font-size:14px;line-height:1.5;overflow:hidden}
 .paper p{margin:0}.paper .pbar{height:8px;background:#1f8a78}.paper .pin{padding:clamp(18px,5vw,48px)}
 .paper .ph{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -113,7 +127,7 @@ pre,.scroll{overflow-x:auto}
   <div class="top"><div><h1>Dozenten-Cockpit</h1><p>NTG-Nachhilfe und Dozententätigkeit · Stunden, Rechnungen, Schüler, Akquise</p></div><div class="row"><span class="pill" id="status">Lädt…</span><button class="pill" id="logout" data-act="logout" hidden>Abmelden</button></div></div>
   <div class="head"><div class="kpis" id="kpis"></div><div><div class="bars" id="bars"></div><div class="barcap">Unterrichtsstunden pro Monat, letzte 6 Monate</div></div></div>
 </div></header>
-<nav id="nav"><a href="#stunden">Stunden</a><a href="#rechnungen">Rechnungen</a><a href="#schueler">Schüler</a><a href="#akquise">Akquise</a><a href="#einstellungen">Einstellungen</a></nav>
+<nav id="nav"><a href="#stunden">Stunden</a><a href="#rechnungen">Rechnungen</a><a href="#einnahmen">Einnahmen</a><a href="#schueler">Schüler</a><a href="#akquise">Akquise</a><a href="#einstellungen">Einstellungen</a></nav>
 <main><div class="wrap" id="view"></div></main>
 <div id="modal"></div>
 <div id="auth"></div>
@@ -129,7 +143,7 @@ try{const l=JSON.parse(localStorage.getItem('dz-state')||'null');if(l&&l.v===1&&
 let MODAL=null,canStore=true;
 /* Download direkt im Browser (ersetzt die Artifact-Downloads-Funktion) */
 const DL={save:async({filename,data})=>{const u=URL.createObjectURL(data),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}};
-const TABS=['stunden','rechnungen','schueler','akquise','einstellungen'];
+const TABS=['stunden','rechnungen','einnahmen','schueler','akquise','einstellungen'];
 const MON=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const STAT=['Geplant','Beworben','Gespräch','Zusage','Aktiv','Absage'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -261,7 +275,78 @@ function vSettings(){
   <div class="row" style="margin-bottom:12px"><button class="btn" data-act="copy">Daten kopieren</button></div>
   <label>Daten einfügen<textarea id="imp" placeholder="Gesicherten Text hier einfügen"></textarea></label><div class="row" style="margin-top:10px"><button class="btn" data-act="import" data-confirm>Importieren</button></div></section>`;
 }
-function render(){renderHead();$('#view').innerHTML={stunden:vStunden,rechnungen:vRechnungen,schueler:vSchueler,akquise:vAkquise,einstellungen:vSettings}[tab()]();if(MODAL)renderModal()}
+function render(){renderHead();$('#view').innerHTML={stunden:vStunden,rechnungen:vRechnungen,einnahmen:vEinnahmen,schueler:vSchueler,akquise:vAkquise,einstellungen:vSettings}[tab()]();if(MODAL)renderModal()}
+
+/* Einnahmen */
+let EF={year:'cur',client:'all',status:'all',basis:'rechnung'};
+try{const l=JSON.parse(localStorage.getItem('dz-ef')||'null');if(l)EF={...EF,...l}}catch(e){}
+const yearSel=()=>EF.year==='cur'?today().slice(0,4):EF.year;
+const eDate=i=>EF.basis==='zahlung'?(i.paid?(i.paidDate||i.date):''):i.date;
+function eRows(ignoreYear){return S.invoices.map(i=>({i,d:eDate(i)})).filter(r=>r.d)
+  .filter(r=>EF.client==='all'||r.i.client.name===EF.client)
+  .filter(r=>EF.basis==='zahlung'||EF.status==='all'||(EF.status==='paid')===!!r.i.paid)
+  .filter(r=>ignoreYear||EF.year==='all'||r.d.startsWith(yearSel()))}
+const eur0=n=>Math.round(n).toLocaleString('de-DE')+' €';
+const qOf=d=>d.slice(0,4)+' Q'+(Math.floor((+d.slice(5,7)-1)/3)+1);
+function niceStep(v){const raw=Math.max(v,100)/4,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return(f<=1?1:f<=2?2:f<=5?5:10)*p}
+function barChart(labels,values,o){
+  const n=labels.length,vw=window.innerWidth,avail=Math.max(300,Math.min(1180,vw)-2*Math.max(vw*.05,16)-2*Math.max(16,Math.min(26,vw*.025))-2),W=Math.round(Math.max(300,Math.min(avail,n*(o.step||70)+110))),H=290,m={l:62,r:14,t:34,b:54},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const st=niceStep(Math.max(...values,0)),mx=st*4,slot=iw/n,bw=Math.min(24,slot*.6),useShort=!!o.short&&slot<30,lstep=useShort?1:Math.max(1,Math.ceil((o.lw||26)/slot)),lbl=useShort?o.short:labels;
+  const tick=v=>mx>=10000?(v/1000).toLocaleString('de-DE')+' Tsd. €':Math.round(v).toLocaleString('de-DE')+' €';
+  const yAt=v=>m.t+ih-v/mx*ih;
+  const top=values.indexOf(Math.max(...values)),lab=new Set(Math.max(...values)>0?[top]:[]);if(o.sel>=0&&values[o.sel]>0)lab.add(o.sel);
+  const bar=(x,y,w,hh)=>{if(hh<=0)return'';const r=Math.min(4,hh,w/2);return `M${x},${y+hh}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+hh}Z`};
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img" aria-label="${esc(o.title)}">
+   ${[0,1,2,3,4].map(k=>{const v=st*k,y=yAt(v);return `<line class="cg" x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}"/><text class="cx" x="${m.l-10}" y="${y+4}" text-anchor="end">${esc(tick(v))}</text>`}).join('')}
+   ${values.map((v,k)=>{const hh=v/mx*ih,cx=m.l+slot*k+slot/2,x=cx-bw/2,y=yAt(v);
+     return `<g class="bg" tabindex="0" data-v="${esc(eur(v))}" data-l="${esc(o.tips[k])}" aria-label="${esc(o.tips[k]+': '+eur(v))}"><rect class="hit" x="${cx-slot/2}" y="${m.t}" width="${slot}" height="${ih+m.b-14}"/><path class="cb ${o.sel>=0&&k!==o.sel?'dim':''}" d="${bar(x,y,bw,hh)}"/>
+     ${lab.has(k)?`<text class="cv" x="${cx}" y="${y-7}" text-anchor="middle">${esc(eur(v))}</text>`:''}${k%lstep===0?`<text class="cx" x="${cx}" y="${H-m.b+18}" text-anchor="middle">${esc(lbl[k])}</text>`:''}</g>`}).join('')}
+   <text class="cx" x="${m.l+iw/2}" y="${H-8}" text-anchor="middle">${esc(o.xcap)}</text>
+   <text class="cx" x="4" y="14">Einnahmen (€)</text>
+  </svg><div class="tip" hidden></div></div>`}
+function vEinnahmen(){
+  const cur=+today().slice(0,4);
+  const years=[...new Set([String(cur),...S.invoices.flatMap(i=>[i.date.slice(0,4),(i.paidDate||'').slice(0,4)]).filter(Boolean)])].sort().reverse();
+  const clients=[...new Set(S.invoices.map(i=>i.client.name))].sort((a,b)=>a.localeCompare(b,'de'));
+  const rows=eRows(false).sort((a,b)=>b.d.localeCompare(a.d)||b.i.nr.localeCompare(a.i.nr,'de',{numeric:true}));
+  const total=sum(rows,r=>r.i.total),ue=sum(rows,r=>sum(r.i.items,t=>+t.ue)),openSum=sum(rows.filter(r=>!r.i.paid),r=>r.i.total);
+  const ys=eRows(true).map(r=>+r.d.slice(0,4)),y0=Math.min(cur,...ys),y1=Math.max(cur,...ys),yl=[];for(let y=y0;y<=y1;y++)yl.push(y);
+  const allR=eRows(true),yv=yl.map(y=>sum(allR.filter(r=>r.d.startsWith(String(y))),r=>r.i.total)),yn=yl.map(y=>allR.filter(r=>r.d.startsWith(String(y))).length);
+  const ysel=EF.year==='all'?-1:yl.indexOf(+yearSel());
+  let ml=[];
+  if(EF.year!=='all'){for(let k=1;k<=12;k++)ml.push(yearSel()+'-'+pad(k))}
+  else{const ks=rows.map(r=>r.d.slice(0,7)).sort();if(ks.length){let[y,mo]=ks[0].split('-').map(Number);const[ey,em]=ks[ks.length-1].split('-').map(Number);while(y<ey||(y===ey&&mo<=em)){ml.push(y+'-'+pad(mo));if(++mo>12){mo=1;y++}}}else for(let k=1;k<=12;k++)ml.push(cur+'-'+pad(k));ml=ml.slice(-36)}
+  const mv=ml.map(k=>sum(rows.filter(r=>r.d.startsWith(k)),r=>r.i.total)),mn=ml.map(k=>rows.filter(r=>r.d.startsWith(k)).length);
+  const mlab=ml.map(k=>MON[+k.slice(5)-1].slice(0,3)+(EF.year==='all'?' '+k.slice(2,4):'')),mtip=ml.map(k=>MON[+k.slice(5)-1]+' '+k.slice(0,4));
+  const qk=EF.year==='all'?[...new Set(rows.map(r=>qOf(r.d)))].sort().reverse():[1,2,3,4].map(q=>yearSel()+' Q'+q);
+  const qr=qk.map(k=>{const rs=rows.filter(r=>qOf(r.d)===k);return{k:k.split(' ').reverse().join(' '),n:rs.length,s:sum(rs,r=>r.i.total)}});
+  const cl=[...new Set(rows.map(r=>r.i.client.name))].map(c=>{const rs=rows.filter(r=>r.i.client.name===c);return{c,n:rs.length,s:sum(rs,r=>r.i.total)}}).sort((a,b)=>b.s-a.s);
+  const opt=(v,t,cur2)=>`<option value="${esc(v)}" ${String(cur2)===String(v)?'selected':''}>${esc(t)}</option>`;
+  const dlab=EF.basis==='zahlung'?'Zahlungseingang':'Rechnungsdatum';
+  const vtitle=EF.year==='all'?'alle Jahre':yearSel();
+  return `<section class="card"><h2>Einnahmen</h2><div class="grid">
+   <label>Jahr<select data-ef="year">${opt('all','Alle Jahre',EF.year)}${years.map(y=>opt(y,y,yearSel()===y&&EF.year!=='all'?y:'')).join('')}</select></label>
+   <label>Auftraggeber<select data-ef="client">${opt('all','Alle Auftraggeber',EF.client)}${clients.map(c=>opt(c,c,EF.client)).join('')}</select></label>
+   <label>Status<select data-ef="status" ${EF.basis==='zahlung'?'disabled':''}>${opt('all','Alle',EF.status)}${opt('paid','Bezahlt',EF.status)}${opt('open','Offen',EF.status)}</select></label>
+   <label>Zeitpunkt zählt nach<select data-ef="basis">${opt('rechnung','Rechnungsdatum',EF.basis)}${opt('zahlung','Zahlungseingang (nur bezahlte)',EF.basis)}</select></label>
+  </div><div class="ek"><div><b>${eur(total)}</b><span>Einnahmen</span></div><div><b>${rows.length}</b><span>Rechnung${rows.length===1?'':'en'}</span></div><div><b>${num(ue)}</b><span>Unterrichtsstunden</span></div><div><b>${ue?eur(total/ue):'–'}</b><span>Durchschnitt je Unterrichtsstunde</span></div>${EF.basis==='rechnung'&&openSum?`<div><b>${eur(openSum)}</b><span>davon noch unbezahlt</span></div>`:''}</div>
+  <p class="muted" style="margin:12px 0 0">„Zahlungseingang“ zählt nur bezahlte Rechnungen mit ihrem Zahlungsdatum, wie es bei der Einnahmen-Überschuss-Rechnung üblich ist. Das ist eine Orientierung und keine Steuerberatung.</p></section>
+  <section class="card"><h2>Einnahmen je Monat · ${esc(vtitle)}</h2>${S.invoices.length?barChart(mlab,mv,{tips:mtip,sel:-1,xcap:'Monat',short:EF.year==='all'?null:ml.map(k=>MON[+k.slice(5)-1][0]),lw:EF.year==='all'?46:26,title:'Säulendiagramm der Einnahmen je Monat, '+vtitle}):'<div class="empty">Noch keine Rechnungen.</div>'}
+   <details class="tv"><summary>Als Tabelle anzeigen</summary><table><thead><tr><th>Monat</th><th class="r">Rechnungen</th><th class="r">Einnahmen</th></tr></thead><tbody>${ml.map((k,j)=>`<tr><td>${esc(mtip[j])}</td><td class="r">${mn[j]}</td><td class="r">${eur(mv[j])}</td></tr>`).join('')}</tbody></table></details></section>
+  <section class="card"><h2>Einnahmen je Jahr</h2>${S.invoices.length?barChart(yl.map(String),yv,{tips:yl.map(String),sel:ysel,xcap:'Jahr',title:'Säulendiagramm der Einnahmen je Jahr',step:150}):'<div class="empty">Noch keine Rechnungen.</div>'}
+   <details class="tv"><summary>Als Tabelle anzeigen</summary><table><thead><tr><th>Jahr</th><th class="r">Rechnungen</th><th class="r">Einnahmen</th></tr></thead><tbody>${yl.map((y,j)=>`<tr><td>${y}</td><td class="r">${yn[j]}</td><td class="r">${eur(yv[j])}</td></tr>`).join('')}</tbody></table></details></section>
+  <section class="card"><h2>Nach Quartal</h2>${qr.length?`<table class="stack"><thead><tr><th>Quartal</th><th class="r">Rechnungen</th><th class="r">Einnahmen</th></tr></thead><tbody>${qr.map(q=>`<tr><td><b>${esc(q.k)}</b></td><td class="r">${q.n}</td><td class="r">${eur(q.s)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Keine Einnahmen im gewählten Zeitraum.</div>'}</section>
+  <section class="card"><h2>Nach Auftraggeber</h2>${cl.length?`<table class="stack"><thead><tr><th>Auftraggeber</th><th class="r">Rechnungen</th><th class="r">Einnahmen</th><th class="r">Anteil</th></tr></thead><tbody>${cl.map(c=>`<tr><td><b>${esc(c.c)}</b></td><td class="r">${c.n}</td><td class="r">${eur(c.s)}</td><td class="r">${total?Math.round(c.s/total*100):0} %</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Keine Einnahmen im gewählten Zeitraum.</div>'}</section>
+  <section class="card"><h2>Rechnungen im gewählten Zeitraum</h2>${rows.length?`<table class="stack"><thead><tr><th>Nr.</th><th>${dlab}</th><th>Auftraggeber</th><th>Zeitraum</th><th class="r">Betrag</th><th>Status</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="nw"><button class="btn sm" data-act="view" data-id="${esc(r.i.id)}">${esc(r.i.nr)}</button></td><td class="nw">${de(r.d)}</td><td>${esc(r.i.client.name)}</td><td>${esc(period(r.i))}</td><td class="r">${eur(r.i.total)}</td><td><span class="tag ${r.i.paid?'ok':'open'}">${r.i.paid?'Bezahlt'+(r.i.paidDate?' '+de(r.i.paidDate):''):'Offen'}</span></td></tr>`).join('')}<tr><td></td><td></td><td></td><td class="r"><b>Summe</b></td><td class="r"><b>${eur(total)}</b></td><td></td></tr></tbody></table>`:'<div class="empty">Keine Rechnungen für diese Auswahl.</div>'}</section>`;
+}
+function showTip(g){const w=g.closest('.chart'),t=w.querySelector('.tip');t.textContent='';const b=document.createElement('b'),s=document.createElement('span');b.textContent=g.dataset.v;s.textContent=g.dataset.l;t.append(b,s);t.hidden=false;
+  const r=w.getBoundingClientRect(),c=g.querySelector('.cb').getBoundingClientRect(),hit=g.querySelector('.hit').getBoundingClientRect();
+  t.style.left=(hit.left+hit.width/2-r.left+w.scrollLeft)+'px';t.style.top=Math.max(c.top-r.top+w.scrollTop-6,40)+'px'}
+function hideTip(g){const t=g.closest('.chart').querySelector('.tip');t.hidden=true}
+document.addEventListener('pointerover',e=>{const g=e.target.closest&&e.target.closest('.bg');if(g)showTip(g)});
+document.addEventListener('pointerout',e=>{const g=e.target.closest&&e.target.closest('.bg');if(g&&!g.contains(e.relatedTarget))hideTip(g)});
+document.addEventListener('focusin',e=>{const g=e.target.closest&&e.target.closest('.bg');if(g)showTip(g)});
+document.addEventListener('focusout',e=>{const g=e.target.closest&&e.target.closest('.bg');if(g)hideTip(g)});
 
 /* Rechnungen */
 function nextNr(){let n=S.me.nextNr||'1';const y=today().slice(0,4);if(/^\d{4}-/.test(n)&&n.slice(0,4)!==y)n=y+'-001';
@@ -422,7 +507,9 @@ document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Obj
 document.addEventListener('change',e=>{const x=e.target;
   if(x.matches('#f-entry [name=client]'))$('#f-entry [name=rate]').value=client(x.value).rate;
   if(x.matches('#f-entry [name=student]')){const p=[...S.entries].reverse().find(en=>en.student===x.value.trim());if(p)$('#f-entry [name=g]').value=p.g}
+  if(x.dataset.ef){EF[x.dataset.ef]=x.value;try{localStorage.setItem('dz-ef',JSON.stringify(EF))}catch(e){}render()}
   if(x.dataset.lead){const l=S.leads.find(v=>v.id===x.dataset.lead);l.status=x.value;if(!l.date)l.date=today();commit('Status: '+x.value)}});
+let RT=null;window.addEventListener('resize',()=>{clearTimeout(RT);RT=setTimeout(()=>{if(tab()==='einnahmen'&&!MODAL)render()},250)});
 window.addEventListener('hashchange',()=>{try{localStorage.setItem('dz-tab',tab())}catch(e){}render();window.scrollTo(0,0)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MODAL)closeModal()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&USER&&!CT)pull()});
