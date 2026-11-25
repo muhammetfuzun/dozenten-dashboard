@@ -317,7 +317,9 @@ const act={
   delClient:b=>{saveMe(false);S.clients=S.clients.filter(c=>c.id!==b.dataset.id);commit('Auftraggeber entfernt')},
   signup:()=>doSignup(),
   localOnly:()=>{LOCAL_ONLY=true;hideAuth();status('Lokal gespeichert')},
-  logout:async()=>{await SB.auth.signOut();try{localStorage.removeItem('dz-state')}catch(e){}location.reload()},
+  logout:async()=>{try{await SB.auth.signOut({scope:'local'})}catch(e){}
+    try{Object.keys(localStorage).filter(k=>k.startsWith('sb-')||k==='dz-state').forEach(k=>localStorage.removeItem(k))}catch(e){}
+    location.reload()},
   copy:async()=>{try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Daten kopiert')}catch(e){toast('Kopieren nicht möglich')}},
   import:()=>{try{const x=JSON.parse($('#imp').value);if(x.v!==1||!Array.isArray(x.entries))throw 0;S=x;commit('Daten importiert')}catch(e){toast('Text ist keine gültige Sicherung')}}
 };
