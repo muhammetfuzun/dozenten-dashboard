@@ -141,10 +141,10 @@ function cloudSave(){if(!SB||!USER){status(canStore?'Lokal gespeichert':'Speiche
   status('Speichert…');clearTimeout(CT);CT=setTimeout(pushNow,800)}
 async function pushNow(){CT=null;if(!SB||!USER)return;
   const{error}=await SB.from('cockpit_state').upsert({user_id:USER.id,data:S,updated_at:new Date().toISOString()});
-  status(error?'Cloud nicht erreichbar (lokal gesichert)':'In der Cloud gespeichert')}
+  status(error?'Cloud-Fehler beim Speichern: '+error.message:'In der Cloud gespeichert')}
 async function pull(){if(!SB||!USER)return;
   const{data,error}=await SB.from('cockpit_state').select('data').eq('user_id',USER.id).maybeSingle();
-  if(error){status('Cloud nicht erreichbar (lokal gesichert)');return}
+  if(error){status('Cloud-Fehler beim Laden: '+error.message);return}
   const r=data&&data.data;
   if(!r){await pushNow();return}
   if(r.v===1&&(r.ts||0)>(S.ts||0)){S=r;try{localStorage.setItem('dz-state',JSON.stringify(S))}catch(e){}render()}

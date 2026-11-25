@@ -17,3 +17,4 @@ create policy "eigene zeile" on public.cockpit_state
   with check (auth.uid() = user_id);
 
 revoke all on public.cockpit_state from anon;
+grant select, insert, update, delete on public.cockpit_state to authenticated;
