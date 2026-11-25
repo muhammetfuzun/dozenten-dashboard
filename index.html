@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dozenten-Cockpit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700&amp;family=Red+Hat+Text:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+/* VOICE: ruhiges Arbeitswerkzeug, Zahlen zuerst
+   IDEA: Stundenzettel + Rechnungsblock eines Dozenten
+   PICTURE: Monatsbalken der Unterrichtsstunden im Kopfband, darunter das Erfassungsformular
+   COLOUR and TYPE: Grüntöne der Rechnung (#146155, #1f8a78, #cfe3df), Gelb für Offenes; Red Hat Display/Text
+   LAYOUT: Kennzahlen + Balken oben, Tabs, eine Spalte Arbeitsfläche */
+:root{color-scheme:light dark;--bg:light-dark(#f4f8f7,#0b1715);--panel:light-dark(#ffffff,#12221f);--ink:light-dark(#1c2430,#e6efed);--mute:light-dark(#5d6b78,#9db3ae);--line:light-dark(#d9e6e3,#21403a);--band:light-dark(#146155,#0f4a40);--acc:#1f8a78;--ok:light-dark(#146155,#6fcfba);--soft:light-dark(#cfe3df,#1a3732)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Red Hat Text",system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Red Hat Display",system-ui,sans-serif;margin:0;line-height:1.1;text-wrap:balance}
+h1{font-size:clamp(30px,5vw,44px)}h2{font-size:22px;margin-bottom:14px}h3{font-size:17px}
+.band{padding:clamp(24px,4vw,48px) max(5vw,16px);background:var(--band);color:#fff}
+.wrap{max-width:1180px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.top p{margin:6px 0 0;color:#cfe3df}
+.pill{font-size:13px;padding:5px 12px;border-radius:99px;background:rgba(255,255,255,.12);color:#dfe5f5;white-space:nowrap}
+.head{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;margin-top:26px;align-items:end}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kpi{background:rgba(255,255,255,.07);border-radius:14px;padding:14px 16px}
+.kpi b{display:block;font:700 clamp(24px,3.4vw,32px)/1.1 "Red Hat Display",sans-serif;white-space:nowrap}
+.kpi span{font-size:13px;color:#cfe3df}.kpi.hot b{color:#fff3cd}
+.bars{display:flex;gap:10px;align-items:flex-end;height:170px;padding-top:24px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;font-size:13px;color:#cfe3df}
+.bar i{display:block;width:100%;max-width:46px;border-radius:6px 6px 2px 2px;background:#5fb9a7;min-height:3px;transition:height .4s}
+.bar.now i{background:#fff}.bar em{font-style:normal;color:#fff;font-weight:700}
+.barcap{font-size:13px;color:#cfe3df;margin-top:6px}
+nav{display:flex;gap:4px;overflow-x:auto;padding:0 max(5vw,16px);background:var(--band);border-top:1px solid rgba(255,255,255,.1)}
+nav a{flex:none;color:#cfe3df;text-decoration:none;padding:14px 14px 12px;border-bottom:3px solid transparent;font-weight:500}
+nav a.on{color:#fff;border-color:#fff}
+main{padding:28px max(5vw,16px) 60px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:clamp(16px,2.5vw,26px);margin-bottom:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px 14px;margin-bottom:16px}
+.wide{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mute);font-weight:500}
+input,select,textarea{font:16px "Red Hat Text",sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;width:100%}
+textarea{min-height:88px;resize:vertical}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;max-width:100%;height:44px;line-height:1.2;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
+input[type=date]::-webkit-datetime-edit{padding:0}
+select{-webkit-appearance:none;appearance:none;height:44px;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;text-overflow:ellipsis}
+input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.btn{font:700 15px "Red Hat Text",sans-serif;min-height:44px;padding:10px 18px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:14px}
+.btn.armed{background:var(--acc);color:#fff;border-color:var(--acc)}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.muted{color:var(--mute);font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;font-size:13px;color:var(--mute);font-weight:500;padding:8px 8px;border-bottom:1px solid var(--line)}
+td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.r{text-align:right;white-space:nowrap}.nw{white-space:nowrap}
+.tag{display:inline-block;font-size:13px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--soft);white-space:nowrap}
+.tag.open{background:#fff3cd;color:#5c4500}.tag.ok{color:var(--ok)}
+.grp{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}.grp:first-of-type{border:0;margin-top:0;padding-top:0}
+#clients{margin-bottom:20px}#clients .grid{margin-bottom:0}
+input[type=checkbox]{width:22px;height:22px;min-height:0;accent-color:var(--acc)}
+.empty{padding:22px;text-align:center;color:var(--mute);border:1px dashed var(--line);border-radius:12px}
+details summary{cursor:pointer;font-weight:700;padding:8px 0}
+.warn{background:light-dark(#fff3cd,#3a3010);border:1px solid #e6c65c;border-radius:10px;padding:10px 14px;font-size:14px;margin-bottom:14px}
+#modal{position:fixed;inset:0;background:rgba(8,30,26,.6);display:none;overflow-y:auto;padding:20px 12px;z-index:9}
+#modal.show{display:block}
+.mbar{max-width:800px;margin:0 auto 12px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.paper{max-width:800px;margin:0 auto;background:#fff;color:#111;border-radius:6px;padding:clamp(20px,5vw,56px);font-size:14px;line-height:1.5}
+.paper h1{font-size:28px;color:#146155;margin-bottom:18px}.paper p{margin:0}.paper .gap{height:16px}
+.paper table{font-size:13px;margin:12px 0}.paper th{background:#1f8a78;color:#fff;font-weight:700}.paper td,.paper th{border-color:#d9e6e3}
+.paper table.meta{width:auto;margin:0}.meta td{border:0;padding:2px 24px 2px 0}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 18px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:10}
+.toast.show{opacity:1}
+pre,.scroll{overflow-x:auto}
+@media(max-width:760px){.head{grid-template-columns:minmax(0,1fr)}.bars{height:130px}}
+@media(max-width:600px){table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mute);font-size:13px}.stack td:empty{display:none}.paper .stack td{padding-inline-start:6.5em}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="band"><div class="wrap">
+  <div class="top"><div><h1>Dozenten-Cockpit</h1><p>NTG-Nachhilfe und Dozententätigkeit · Stunden, Rechnungen, Schüler, Akquise</p></div><span class="pill" id="status">Lädt…</span></div>
+  <div class="head"><div class="kpis" id="kpis"></div><div><div class="bars" id="bars"></div><div class="barcap">Unterrichtsstunden pro Monat, letzte 6 Monate</div></div></div>
+</div></header>
+<nav id="nav"><a href="#stunden">Stunden</a><a href="#rechnungen">Rechnungen</a><a href="#schueler">Schüler</a><a href="#akquise">Akquise</a><a href="#einstellungen">Einstellungen</a></nav>
+<main><div class="wrap" id="view"></div></main>
+<div id="modal"></div>
+<div class="toast" id="toast"></div>
+<!-- Leere Startdaten. Eigene Daten über Einstellungen → Importieren laden. Änderungen werden im Browser (localStorage) gespeichert; Sicherung über Einstellungen → Daten kopieren. -->
+<script id="state" type="application/json">{"v": 1, "ts": 0, "me": {"name": "", "street": "", "city": "", "email": "", "tel": "", "steuernr": "", "iban": "", "hinweis": "Umsatzsteuerbefreit gemäß § 4 Nr. 21 UStG.", "ziel": 14, "zweck": "NTG-Nachhilfe IHK", "nextNr": "2026-001"}, "clients": [], "entries": [], "invoices": [], "students": [], "leads": [], "last": {}}</script>
+<script>
+{
+const $=s=>document.querySelector(s);
+let S=JSON.parse(document.getElementById('state').textContent);
+try{const l=JSON.parse(localStorage.getItem('dz-state')||'null');if(l&&l.v===1&&l.ts>S.ts)S=l}catch(e){}
+let MODAL=null,canStore=true;
+/* Download direkt im Browser (ersetzt die Artifact-Downloads-Funktion) */
+const DL={save:async({filename,data})=>{const u=URL.createObjectURL(data),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}};
+const TABS=['stunden','rechnungen','schueler','akquise','einstellungen'];
+const MON=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const STAT=['Geplant','Beworben','Gespräch','Zusage','Aktiv','Absage'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const de=iso=>iso?iso.split('-').reverse().join('.'):'';
+const fx=n=>(Math.round(n*100)/100).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const eur=n=>fx(n)+' €';
+const num=n=>(+n).toLocaleString('de-DE',{maximumFractionDigits:2});
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
+const client=id=>S.clients.find(c=>c.id===id)||{name:'(gelöschter Auftraggeber)',addr:'',rate:0};
+const lineText=e=>[e.leistung,de(e.date),e.student?(e.g==='w'?'Schülerin: ':'Schüler: ')+e.student:''].filter(Boolean).join(', ');
+const period=i=>i.period[0]===i.period[1]?de(i.period[0]):de(i.period[0])+' – '+de(i.period[1]);
+const menge=u=>num(u)+' Unterrichtsstunde'+(+u===1?'':'n');
+const zweck=i=>{const m=+i.period[1].slice(5,7)-1;return 'Rechnung '+i.nr+' – '+(i.from||S.me).zweck+', '+MON[m]+' '+i.period[1].slice(0,4)};
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2400)}
+function status(t){$('#status').textContent=t}
+function tab(){const h=location.hash.slice(1);if(TABS.includes(h))return h;try{const l=localStorage.getItem('dz-tab');if(TABS.includes(l))return l}catch(e){}return 'stunden'}
+
+/* Speichern (lokal im Browser) */
+function commit(msg){S.ts=Date.now();try{localStorage.setItem('dz-state',JSON.stringify(S));canStore=true}catch(e){canStore=false}render();if(msg)toast(msg);status(canStore?'Gespeichert':'Speichern nicht möglich')}
+
+/* Kopf */
+function renderHead(){
+  const ym=today().slice(0,7),y=ym.slice(0,4);
+  const open=S.entries.filter(e=>!e.inv),unpaid=S.invoices.filter(i=>!i.paid);
+  const k=[[num(sum(S.entries.filter(e=>e.date.startsWith(ym)),e=>+e.ue)),'Unterrichtsstunden im '+MON[+ym.slice(5)-1],''],
+    [eur(sum(S.invoices.filter(i=>i.date.startsWith(y)),i=>i.total)),'Abgerechnet '+y,''],
+    [eur(sum(open,e=>e.ue*e.rate)),num(sum(open,e=>+e.ue))+' UStd. noch nicht abgerechnet',open.length?'hot':''],
+    [eur(sum(unpaid,i=>i.total)),unpaid.length+' Rechnung'+(unpaid.length===1?'':'en')+' unbezahlt',unpaid.length?'hot':'']];
+  $('#kpis').innerHTML=k.map(([b,s,c])=>`<div class="kpi ${c}"><b>${b}</b><span>${s}</span></div>`).join('');
+  const d=new Date(),ms=[];for(let i=5;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);ms.push(x.getFullYear()+'-'+pad(x.getMonth()+1))}
+  const v=ms.map(m=>sum(S.entries.filter(e=>e.date.startsWith(m)),e=>+e.ue)),mx=Math.max(1,...v);
+  $('#bars').innerHTML=ms.map((m,i)=>`<div class="bar ${i===5?'now':''}"><em>${v[i]?num(v[i]):''}</em><i style="height:${Math.round(v[i]/mx*100)}%"></i>${MON[+m.slice(5)-1].slice(0,3)}</div>`).join('');
+  for(const a of document.querySelectorAll('#nav a'))a.classList.toggle('on',a.getAttribute('href')==='#'+tab());
+}
+
+/* Ansichten */
+function vStunden(){
+  const L=S.last||{},c0=client(L.client||S.clients[0]?.id);
+  const opts=S.clients.map(c=>`<option value="${esc(c.id)}" ${c.id===L.client?'selected':''}>${esc(c.name)}</option>`).join('');
+  const open=S.entries.filter(e=>!e.inv).sort((a,b)=>a.date.localeCompare(b.date));
+  const groups=S.clients.map(c=>[c,open.filter(e=>e.client===c.id)]).filter(g=>g[1].length);
+  const done=S.entries.filter(e=>e.inv).sort((a,b)=>b.date.localeCompare(a.date));
+  const months=[...new Set(done.map(e=>e.date.slice(0,7)))];
+  return `<form id="f-entry" class="card"><h2>Stunden eintragen</h2><div class="grid">
+   <label>Datum<input type="date" name="date" value="${today()}" required></label>
+   <label>Auftraggeber<select name="client" required>${opts}</select></label>
+   <label>Schüler/in<input name="student" list="dl-st" autocomplete="off" placeholder="Name"></label>
+   <label>Anrede auf Rechnung<select name="g"><option value="m">Schüler</option><option value="w">Schülerin</option></select></label>
+   <label class="wide">Leistung<input name="leistung" value="${esc(L.leistung||'Einzelunterricht NTG (IHK-Weiterbildung)')}" required></label>
+   <label>Unterrichtsstunden<input type="number" name="ue" step="0.25" min="0.25" value="${esc(L.ue||2)}" inputmode="decimal" required></label>
+   <label>Satz (€ je UStd.)<input type="number" name="rate" step="0.01" min="0" value="${esc(c0.rate)}" inputmode="decimal" required></label>
+  </div><datalist id="dl-st">${S.students.map(s=>`<option value="${esc(s.name)}">`).join('')}</datalist>
+  <button class="btn pri" ${S.clients.length?'':'disabled'}>Eintragen</button>${S.clients.length?'':' <span class="muted">Lege zuerst unter Einstellungen einen Auftraggeber an.</span>'}</form>
+  <section class="card"><h2>Noch nicht abgerechnet</h2>${groups.length?groups.map(([c,es])=>`<div class="grp">
+   <div class="spread"><h3>${esc(c.name)}</h3><button class="btn acc" data-act="bill" data-c="${esc(c.id)}">Rechnung erstellen · <span data-lbl="${esc(c.id)}">${eur(sum(es,e=>e.ue*e.rate))}</span></button></div>
+   <table class="stack"><thead><tr><th>Abrechnen</th><th>Datum</th><th>Schüler/in</th><th>Leistung</th><th class="r">UStd.</th><th class="r">Betrag</th><th></th></tr></thead><tbody>
+   ${es.map(e=>`<tr><td><input type="checkbox" checked data-sel="${esc(e.id)}" data-c="${esc(c.id)}" aria-label="abrechnen"></td><td class="nw">${de(e.date)}</td><td>${esc(e.student)}</td><td>${esc(e.leistung)}</td><td class="r">${num(e.ue)}</td><td class="r">${eur(e.ue*e.rate)}</td><td class="r"><button class="btn sm" data-act="delEntry" data-id="${esc(e.id)}" data-confirm>Löschen</button></td></tr>`).join('')}
+   </tbody></table></div>`).join(''):'<div class="empty">Alles abgerechnet. Neue Stunden erscheinen hier, bis du daraus eine Rechnung erstellst.</div>'}</section>
+  <section class="card"><h2>Abgerechnete Stunden</h2>${months.length?months.map((m,i)=>{const es=done.filter(e=>e.date.startsWith(m));return `<details ${i?'':'open'}><summary>${MON[+m.slice(5)-1]} ${m.slice(0,4)} · ${num(sum(es,e=>+e.ue))} UStd. · ${eur(sum(es,e=>e.ue*e.rate))}</summary>
+   <table class="stack"><thead><tr><th>Datum</th><th>Schüler/in</th><th>Auftraggeber</th><th class="r">UStd.</th><th class="r">Betrag</th><th>Rechnung</th></tr></thead><tbody>
+   ${es.map(e=>{const inv=S.invoices.find(x=>x.id===e.inv);return `<tr><td class="nw">${de(e.date)}</td><td>${esc(e.student)}</td><td>${esc(client(e.client).name)}</td><td class="r">${num(e.ue)}</td><td class="r">${eur(e.ue*e.rate)}</td><td>${inv?`<button class="btn sm" data-act="view" data-id="${esc(inv.id)}">${esc(inv.nr)}</button>`:''}</td></tr>`}).join('')}</tbody></table></details>`}).join(''):'<div class="empty">Noch keine abgerechneten Stunden.</div>'}</section>`;
+}
+function vRechnungen(){
+  const inv=[...S.invoices].sort((a,b)=>b.nr.localeCompare(a.nr,'de',{numeric:true}));
+  return `<section class="card"><div class="spread"><h2 style="margin:0">Rechnungen</h2><span class="muted">Nächste Nummer: ${esc(nextNr())}</span></div>${inv.length?`<table class="stack"><thead><tr><th>Nr.</th><th>Datum</th><th>Empfänger</th><th>Zeitraum</th><th class="r">Betrag</th><th>Status</th><th></th></tr></thead><tbody>
+  ${inv.map(i=>`<tr><td class="nw"><b>${esc(i.nr)}</b></td><td class="nw">${de(i.date)}</td><td>${esc(i.client.name)}</td><td>${esc(period(i))}</td><td class="r">${eur(i.total)}</td>
+  <td><button class="btn sm" data-act="paid" data-id="${esc(i.id)}"><span class="tag ${i.paid?'ok':'open'}">${i.paid?'Bezahlt'+(i.paidDate?' '+de(i.paidDate):''):'Offen'}</span></button></td>
+  <td class="r"><div class="row" style="justify-content:flex-end"><button class="btn sm" data-act="view" data-id="${esc(i.id)}">Ansehen</button><button class="btn sm" data-act="storno" data-id="${esc(i.id)}" data-confirm>Stornieren</button></div></td></tr>`).join('')}</tbody></table>
+  <p class="muted">Status antippen, um zwischen offen und bezahlt zu wechseln. Stornieren löscht die Rechnung und gibt die Stunden wieder zur Abrechnung frei.</p>`:'<div class="empty">Noch keine Rechnungen. Erstelle sie unter Stunden aus deinen Einträgen.</div>'}</section>`;
+}
+function vSchueler(){
+  const t=today(),days=d=>Math.round((new Date(d)-new Date(t))/864e5);
+  const list=[...S.students].sort((a,b)=>(a.exam||'9').localeCompare(b.exam||'9'));
+  return `<form id="f-student" class="card"><h2>Schüler hinzufügen</h2><div class="grid">
+  <label>Name<input name="name" required></label><label>Kurs / Auftraggeber<input name="kurs" placeholder="z. B. NTG · Meisterschmiede"></label>
+  <label>Prüfungstermin<input type="date" name="exam"></label><label>Nächste Session<input type="date" name="next"></label>
+  <label class="wide">Schwachstellen / Fokus<input name="focus" placeholder="z. B. Festigkeitslehre, Cp/Cpk"></label></div><button class="btn pri">Hinzufügen</button></form>
+  <section class="card"><h2>Schüler und Prüfungen</h2>${list.length?`<table class="stack"><thead><tr><th>Name</th><th>Kurs</th><th>Prüfung</th><th>Fokus</th><th>Nächste Session</th><th class="r">UStd. gesamt</th><th></th></tr></thead><tbody>
+  ${list.map(s=>{const n=s.exam?days(s.exam):null;return `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.kurs)}</td><td class="nw">${s.exam?de(s.exam)+(n>=0?` <span class="tag ${n<=21?'open':''}">in ${n} Tagen</span>`:' <span class="tag">vorbei</span>'):'<span class="muted">offen</span>'}</td><td>${esc(s.focus)}</td><td class="nw">${de(s.next)}</td><td class="r">${num(sum(S.entries.filter(e=>e.student===s.name),e=>+e.ue))}</td><td class="r"><button class="btn sm" data-act="delStudent" data-id="${esc(s.id)}" data-confirm>Entfernen</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Noch keine Schüler.</div>'}</section>`;
+}
+function vAkquise(){
+  const order=s=>STAT.indexOf(s.status);
+  const list=[...S.leads].sort((a,b)=>order(a)-order(b));
+  return `<form id="f-lead" class="card"><h2>Kontakt oder Bewerbung hinzufügen</h2><div class="grid">
+  <label>Träger / Stelle<input name="org" required></label><label>Kontakt<input name="contact" placeholder="Name oder E-Mail"></label>
+  <label>Status<select name="status">${STAT.map(s=>`<option>${s}</option>`).join('')}</select></label><label>Datum<input type="date" name="date"></label>
+  <label class="wide">Nächster Schritt<input name="next"></label></div><button class="btn pri">Hinzufügen</button></form>
+  <section class="card"><h2>Akquise</h2>${list.length?`<table class="stack"><thead><tr><th>Träger / Stelle</th><th>Kontakt</th><th>Status</th><th>Datum</th><th>Nächster Schritt</th><th></th></tr></thead><tbody>
+  ${list.map(l=>`<tr><td><b>${esc(l.org)}</b></td><td style="overflow-wrap:anywhere">${esc(l.contact)}</td><td><select data-lead="${esc(l.id)}" aria-label="Status">${STAT.map(s=>`<option ${s===l.status?'selected':''}>${s}</option>`).join('')}</select></td><td class="nw">${de(l.date)}</td><td>${esc(l.next)}</td><td class="r"><button class="btn sm" data-act="delLead" data-id="${esc(l.id)}" data-confirm>Entfernen</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Noch keine Einträge.</div>'}</section>`;
+}
+function vSettings(){
+  const m=S.me,f=(k,l,t='text',x='')=>`<label ${x}>${l}<input type="${t}" name="${k}" value="${esc(m[k])}"></label>`;
+  return `<form id="f-me" class="card"><h2>Absender auf Rechnungen</h2><div class="grid">
+  ${f('name','Name')}${f('street','Straße')}${f('city','PLZ Ort')}${f('email','E-Mail','email')}${f('tel','Telefon','tel')}${f('steuernr','Steuernummer')}${f('iban','IBAN','text','class="wide"')}
+  ${f('hinweis','Steuerhinweis','text','class="wide"')}${f('ziel','Zahlungsziel (Tage)','number')}${f('zweck','Verwendungszweck-Zusatz')}${f('nextNr','Nächste Rechnungsnummer')}</div>
+  <h2 style="margin-top:10px">Auftraggeber</h2><div id="clients">${S.clients.map(c=>`<div class="grid grp" data-cid="${esc(c.id)}"><label>Name<input data-k="name" value="${esc(c.name)}" required></label><label>Anschrift<textarea data-k="addr">${esc(c.addr)}</textarea></label><label>Satz (€ je UStd.)<input data-k="rate" type="number" step="0.01" value="${esc(c.rate)}"></label><div class="row" style="align-self:end">${S.entries.some(e=>e.client===c.id)?'<span class="muted">wird verwendet</span>':`<button type="button" class="btn sm" data-act="delClient" data-id="${esc(c.id)}" data-confirm>Entfernen</button>`}</div></div>`).join('')}</div>
+  <div class="row"><button type="button" class="btn" data-act="addClient">Auftraggeber hinzufügen</button><button class="btn pri">Speichern</button></div></form>
+  <section class="card"><h2>Sicherung</h2><p class="muted">Kopiert alle Daten als Text, z. B. für Google Drive. Einfügen und Importieren ersetzt den aktuellen Stand.</p>
+  <div class="row" style="margin-bottom:12px"><button class="btn" data-act="copy">Daten kopieren</button></div>
+  <label>Daten einfügen<textarea id="imp" placeholder="Gesicherten Text hier einfügen"></textarea></label><div class="row" style="margin-top:10px"><button class="btn" data-act="import" data-confirm>Importieren</button></div></section>`;
+}
+function render(){renderHead();$('#view').innerHTML={stunden:vStunden,rechnungen:vRechnungen,schueler:vSchueler,akquise:vAkquise,einstellungen:vSettings}[tab()]();if(MODAL)renderModal()}
+
+/* Rechnungen */
+function nextNr(){let n=S.me.nextNr||'1';const y=today().slice(0,4);if(/^\d{4}-/.test(n)&&n.slice(0,4)!==y)n=y+'-001';return n}
+function incNr(n){const m=n.match(/^(.*?)(\d+)$/);return m?m[1]+String(+m[2]+1).padStart(m[2].length,'0'):n+'-2'}
+function bill(cid){
+  const ids=[...document.querySelectorAll(`[data-sel][data-c="${CSS.escape(cid)}"]:checked`)].map(x=>x.dataset.sel);
+  const es=S.entries.filter(e=>ids.includes(e.id)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!es.length){toast('Keine Einträge ausgewählt');return}
+  const c=client(cid),nr=nextNr(),id=uid();
+  const inv={id,nr,date:today(),client:{name:c.name,addr:c.addr},from:{...S.me},items:es.map(e=>({text:lineText(e),ue:+e.ue,rate:+e.rate})),period:[es[0].date,es[es.length-1].date],total:Math.round(sum(es,e=>e.ue*e.rate)*100)/100,paid:false};
+  es.forEach(e=>e.inv=id);S.invoices.push(inv);S.me.nextNr=incNr(nr);MODAL=id;commit('Rechnung '+nr+' erstellt');
+}
+function renderModal(){
+  const i=S.invoices.find(x=>x.id===MODAL);if(!i){closeModal();return}
+  const me=i.from||S.me,miss=[!me.steuernr&&'Steuernummer',!me.iban&&'IBAN'].filter(Boolean);
+  $('#modal').innerHTML=`<div class="mbar"><button class="btn acc" data-act="pdf">PDF herunterladen</button><button class="btn" data-act="close">Schließen</button></div>
+  <div style="max-width:800px;margin:0 auto">${miss.length?`<div class="warn">${miss.join(' und ')} fehlt noch. Unter Einstellungen eintragen, dann die Rechnung stornieren und neu erstellen.</div>`:''}</div>
+  <article class="paper"><h1>Rechnung</h1><p><b>${esc(me.name)}</b></p><p>${esc(me.street)} · ${esc(me.city)}</p><p>E-Mail: ${esc(me.email)}</p><p>Tel.: ${esc(me.tel)}</p><p>Steuernummer: ${esc(me.steuernr||'—')}</p><div class="gap"></div>
+  <p><b>Rechnungsempfänger</b></p><p>${esc(i.client.name)}</p>${i.client.addr.split('\n').map(l=>`<p>${esc(l)}</p>`).join('')}<div class="gap"></div>
+  <table class="meta"><tr><td><b>Rechnungsnummer</b></td><td>${esc(i.nr)}</td></tr><tr><td><b>Rechnungsdatum</b></td><td>${de(i.date)}</td></tr><tr><td><b>Leistungszeitraum</b></td><td>${esc(period(i))}</td></tr></table><div class="gap"></div>
+  <p>Sehr geehrte Damen und Herren,</p><p>für meine Dozententätigkeit erlaube ich mir, folgende Leistungen in Rechnung zu stellen:</p>
+  <table class="stack"><thead><tr><th>Pos.</th><th>Leistung</th><th>Menge</th><th class="r">Einzelpreis</th><th class="r">Gesamt</th></tr></thead><tbody>
+  ${i.items.map((t,k)=>`<tr><td>${k+1}</td><td>${esc(t.text)}</td><td>${menge(t.ue)}</td><td class="r">${eur(t.rate)}</td><td class="r">${eur(t.ue*t.rate)}</td></tr>`).join('')}
+  <tr><td></td><td></td><td></td><td class="r"><b>Rechnungsbetrag</b></td><td class="r"><b>${eur(i.total)}</b></td></tr></tbody></table>
+  <p><b>Steuerhinweis:</b> ${esc(me.hinweis)}</p><div class="gap"></div><p><b>Zahlungsbedingungen</b></p><p>Bitte überweisen Sie den Rechnungsbetrag innerhalb von ${esc(me.ziel)} Tagen ohne Abzug auf folgendes Konto:</p>
+  <p><b>Kontoinhaber: ${esc(me.name)}</b></p><p><b>IBAN: ${esc(me.iban||'—')}</b></p><p><b>Verwendungszweck: ${esc(zweck(i))}</b></p><div class="gap"></div>
+  <p>Vielen Dank für die gute Zusammenarbeit.</p><div class="gap"></div><p>Mit freundlichen Grüßen</p><p>${esc(me.name)}</p></article>`;
+  $('#modal').classList.add('show');loadPdf().catch(()=>{});
+}
+function closeModal(){MODAL=null;$('#modal').classList.remove('show');$('#modal').innerHTML=''}
+let pdfP=null;
+function loadPdf(){if(window.jspdf)return Promise.resolve();return pdfP||(pdfP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=()=>{pdfP=null;rej()};document.head.appendChild(s)}))}
+async function makePdf(i){
+  await loadPdf();const d=new window.jspdf.jsPDF({unit:'mm',format:'a4'});const me=i.from||S.me,L=20,R=190,e=n=>fx(n)+' €';let y=24;d.setFillColor(31,138,120);d.rect(0,0,210,5,'F');d.setTextColor(28,36,48);
+  const t=(s,x,yy,o)=>d.text(String(s),x,yy,o),B=()=>d.setFont('helvetica','bold'),N=()=>d.setFont('helvetica','normal');
+  const brk=h=>{if(y+h>275){d.addPage();y=24}};
+  d.setTextColor(20,97,85);B();d.setFontSize(20);t('Rechnung',L,y);d.setTextColor(28,36,48);y+=11;d.setFontSize(10);t(me.name,L,y);y+=5;N();
+  [me.street+' · '+me.city,'E-Mail: '+me.email,'Tel.: '+me.tel,'Steuernummer: '+(me.steuernr||'—')].forEach(s=>{t(s,L,y);y+=5});
+  y+=6;B();t('Rechnungsempfänger',L,y);y+=5;N();[i.client.name,...i.client.addr.split('\n')].filter(s=>s.trim()).forEach(s=>{t(s,L,y);y+=5});
+  y+=6;[['Rechnungsnummer',i.nr],['Rechnungsdatum',de(i.date)],['Leistungszeitraum',period(i)]].forEach(([k,v])=>{B();t(k,L,y);N();t(v,L+45,y);y+=6});
+  y+=6;t('Sehr geehrte Damen und Herren,',L,y);y+=6;d.text(d.splitTextToSize('für meine Dozententätigkeit erlaube ich mir, folgende Leistungen in Rechnung zu stellen:',R-L),L,y);y+=9;
+  d.setFontSize(9.5);d.setFillColor(31,138,120);d.rect(L,y-4.6,R-L,7,'F');B();d.setTextColor(255,255,255);t('Pos.',L+1,y);t('Leistung',L+10,y);t('Menge',L+96,y);t('Einzelpreis',L+148,y,{align:'right'});t('Gesamt',R-1,y,{align:'right'});d.setTextColor(28,36,48);y+=7.5;N();d.setDrawColor(217,230,227);
+  i.items.forEach((it,k)=>{const ln=d.splitTextToSize(it.text,82),h=ln.length*4.4;brk(h+3);t(k+1,L+1,y);d.text(ln,L+10,y);t(menge(it.ue),L+96,y);t(e(it.rate),L+148,y,{align:'right'});t(e(it.ue*it.rate),R-1,y,{align:'right'});y+=h+1.6;d.line(L,y-2.6,R,y-2.6);y+=2});
+  y+=2;d.setFillColor(207,227,223);d.rect(L+104,y-5,R-L-104,8,'F');d.setTextColor(20,97,85);B();t('Rechnungsbetrag',L+148,y,{align:'right'});t(e(i.total),R-1,y,{align:'right'});d.setTextColor(28,36,48);y+=13;d.setFontSize(10);
+  brk(70);B();t('Steuerhinweis:',L,y);const w1=d.getTextWidth('Steuerhinweis: ');N();t(me.hinweis,L+w1,y);y+=9;
+  const zb=d.splitTextToSize('Bitte überweisen Sie den Rechnungsbetrag innerhalb von '+me.ziel+' Tagen ohne Abzug auf folgendes Konto:',R-L);
+  B();t('Zahlungsbedingungen',L,y);y+=5;N();d.text(zb,L,y);y+=zb.length*5+2;
+  B();['Kontoinhaber: '+me.name,'IBAN: '+(me.iban||'—'),'Verwendungszweck: '+zweck(i)].forEach(s=>{d.text(d.splitTextToSize(s,R-L),L,y);y+=5});N();
+  y+=7;t('Vielen Dank für die gute Zusammenarbeit.',L,y);y+=10;t('Mit freundlichen Grüßen',L,y);y+=6;t(me.name,L,y);
+  return d.output('blob');
+}
+
+/* Aktionen */
+const act={
+  bill:b=>bill(b.dataset.c),
+  delEntry:b=>{S.entries=S.entries.filter(e=>e.id!==b.dataset.id);commit('Eintrag gelöscht')},
+  view:b=>{MODAL=b.dataset.id;renderModal()},
+  close:()=>closeModal(),
+  paid:b=>{const i=S.invoices.find(x=>x.id===b.dataset.id);i.paid=!i.paid;i.paidDate=i.paid?today():'';commit(i.paid?'Als bezahlt markiert':'Wieder offen')},
+  storno:b=>{const id=b.dataset.id;S.invoices=S.invoices.filter(i=>i.id!==id);S.entries.forEach(e=>{if(e.inv===id)e.inv=null});commit('Rechnung storniert, Stunden wieder offen')},
+  pdf:async b=>{const i=S.invoices.find(x=>x.id===MODAL);b.disabled=true;b.textContent='Erstelle PDF…';
+    try{const blob=await makePdf(i);await DL.save({filename:'Rechnung_'+i.nr+'.pdf',data:blob});toast('PDF gespeichert')}
+    catch(e){toast('PDF-Bibliothek konnte nicht geladen werden')}
+    if(b.isConnected){b.disabled=false;b.textContent='PDF herunterladen'}},
+  delStudent:b=>{S.students=S.students.filter(s=>s.id!==b.dataset.id);commit('Entfernt')},
+  delLead:b=>{S.leads=S.leads.filter(s=>s.id!==b.dataset.id);commit('Entfernt')},
+  addClient:()=>{saveMe(false);S.clients.push({id:uid(),name:'Neuer Auftraggeber',addr:'',rate:25});render()},
+  delClient:b=>{saveMe(false);S.clients=S.clients.filter(c=>c.id!==b.dataset.id);commit('Auftraggeber entfernt')},
+  copy:async()=>{try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Daten kopiert')}catch(e){toast('Kopieren nicht möglich')}},
+  import:()=>{try{const x=JSON.parse($('#imp').value);if(x.v!==1||!Array.isArray(x.entries))throw 0;S=x;commit('Daten importiert')}catch(e){toast('Text ist keine gültige Sicherung')}}
+};
+function saveMe(doCommit){
+  const f=$('#f-me');if(!f)return;const d=new FormData(f);
+  for(const k of ['name','street','city','email','tel','steuernr','iban','hinweis','zweck','nextNr'])S.me[k]=String(d.get(k)||'').trim();
+  S.me.ziel=+d.get('ziel')||14;
+  for(const row of document.querySelectorAll('[data-cid]')){const c=S.clients.find(x=>x.id===row.dataset.cid);if(!c)continue;
+    c.name=row.querySelector('[data-k=name]').value.trim();c.addr=row.querySelector('[data-k=addr]').value.trim();c.rate=+row.querySelector('[data-k=rate]').value||0}
+  if(doCommit)commit('Einstellungen gespeichert');
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
+  if(b.hasAttribute('data-confirm')&&!b.classList.contains('armed')){b.classList.add('armed');b.dataset.lbl=b.textContent;b.textContent='Sicher?';setTimeout(()=>{if(b.isConnected){b.classList.remove('armed');b.textContent=b.dataset.lbl}},3000);return}
+  act[b.dataset.act]&&act[b.dataset.act](b)});
+document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
+  if(f.id==='f-entry'){S.entries.push({id:uid(),date:d.date,client:d.client,student:d.student.trim(),g:d.g,leistung:d.leistung.trim(),ue:+d.ue,rate:+d.rate,inv:null});
+    if(d.student.trim()&&!S.students.some(s=>s.name===d.student.trim()))S.students.push({id:uid(),name:d.student.trim(),kurs:client(d.client).name,exam:'',focus:'',next:''});
+    S.last={client:d.client,leistung:d.leistung.trim(),ue:+d.ue};commit('Eingetragen: '+num(d.ue)+' UStd.')}
+  if(f.id==='f-student'){S.students.push({id:uid(),name:d.name.trim(),kurs:d.kurs.trim(),exam:d.exam,focus:d.focus.trim(),next:d.next});commit('Hinzugefügt')}
+  if(f.id==='f-lead'){S.leads.push({id:uid(),org:d.org.trim(),contact:d.contact.trim(),status:d.status,date:d.date,next:d.next.trim()});commit('Hinzugefügt')}
+  if(f.id==='f-me')saveMe(true)});
+document.addEventListener('change',e=>{const x=e.target;
+  if(x.matches('#f-entry [name=client]'))$('#f-entry [name=rate]').value=client(x.value).rate;
+  if(x.matches('#f-entry [name=student]')){const p=[...S.entries].reverse().find(en=>en.student===x.value.trim());if(p)$('#f-entry [name=g]').value=p.g}
+  if(x.dataset.lead){const l=S.leads.find(v=>v.id===x.dataset.lead);l.status=x.value;if(!l.date)l.date=today();commit('Status: '+x.value)}
+  if(x.dataset.sel){const c=x.dataset.c,ids=[...document.querySelectorAll(`[data-sel][data-c="${CSS.escape(c)}"]:checked`)].map(v=>v.dataset.sel);
+    $(`[data-lbl="${CSS.escape(c)}"]`).textContent=eur(sum(S.entries.filter(en=>ids.includes(en.id)),en=>en.ue*en.rate))}});
+window.addEventListener('hashchange',()=>{try{localStorage.setItem('dz-tab',tab())}catch(e){}render();window.scrollTo(0,0)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MODAL)closeModal()});
+render();status('Lokal gespeichert');
+}
+</script></body></html>
