@@ -79,6 +79,9 @@ details summary{cursor:pointer;font-weight:700;padding:8px 0}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 18px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:10}
 .toast.show{opacity:1}
 pre,.scroll{overflow-x:auto}
+#auth{position:fixed;inset:0;background:var(--band);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;overflow-y:auto}
+#auth.show{display:flex}
+#auth form{background:var(--panel);border-radius:16px;padding:26px;max-width:380px;width:100%;display:grid;gap:14px}
 @media(max-width:760px){.head{grid-template-columns:minmax(0,1fr)}.bars{height:130px}}
 @media(max-width:600px){table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mute);font-size:13px}.stack td:empty{display:none}.paper .stack td{padding-inline-start:6.5em}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -93,8 +96,10 @@ pre,.scroll{overflow-x:auto}
 <nav id="nav"><a href="#stunden">Stunden</a><a href="#rechnungen">Rechnungen</a><a href="#schueler">Schüler</a><a href="#akquise">Akquise</a><a href="#einstellungen">Einstellungen</a></nav>
 <main><div class="wrap" id="view"></div></main>
 <div id="modal"></div>
+<div id="auth"></div>
 <div class="toast" id="toast"></div>
 <!-- Leere Startdaten. Eigene Daten über Einstellungen → Importieren laden. Änderungen werden im Browser (localStorage) gespeichert; Sicherung über Einstellungen → Daten kopieren. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script id="state" type="application/json">{"v": 1, "ts": 0, "me": {"name": "", "street": "", "city": "", "email": "", "tel": "", "steuernr": "", "iban": "", "hinweis": "Umsatzsteuerbefreit gemäß § 4 Nr. 21 UStG.", "ziel": 14, "zweck": "NTG-Nachhilfe IHK", "nextNr": "2026-001"}, "clients": [], "entries": [], "invoices": [], "students": [], "leads": [], "last": {}}</script>
 <script>
 {
@@ -126,7 +131,36 @@ function status(t){$('#status').textContent=t}
 function tab(){const h=location.hash.slice(1);if(TABS.includes(h))return h;try{const l=localStorage.getItem('dz-tab');if(TABS.includes(l))return l}catch(e){}return 'stunden'}
 
 /* Speichern (lokal im Browser) */
-function commit(msg){S.ts=Date.now();try{localStorage.setItem('dz-state',JSON.stringify(S));canStore=true}catch(e){canStore=false}render();if(msg)toast(msg);status(canStore?'Gespeichert':'Speichern nicht möglich')}
+function commit(msg){S.ts=Date.now();try{localStorage.setItem('dz-state',JSON.stringify(S));canStore=true}catch(e){canStore=false}render();if(msg)toast(msg);cloudSave()}
+
+/* Cloud (Supabase): Login, ein JSON-Stand pro Nutzer, Row Level Security */
+const SB_URL='https://wxyqhsrepfkdhcnllxjx.supabase.co',SB_KEY='sb_publishable_VOA3v19n1bWIJD_abNy2cw_SY5WV2_-';
+let SB=null,USER=null,LOCAL_ONLY=false,CT=null;
+try{SB=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
+function cloudSave(){if(!SB||!USER){status(canStore?'Lokal gespeichert':'Speichern nicht möglich');return}
+  status('Speichert…');clearTimeout(CT);CT=setTimeout(pushNow,800)}
+async function pushNow(){CT=null;if(!SB||!USER)return;
+  const{error}=await SB.from('cockpit_state').upsert({user_id:USER.id,data:S,updated_at:new Date().toISOString()});
+  status(error?'Cloud nicht erreichbar (lokal gesichert)':'In der Cloud gespeichert')}
+async function pull(){if(!SB||!USER)return;
+  const{data,error}=await SB.from('cockpit_state').select('data').eq('user_id',USER.id).maybeSingle();
+  if(error){status('Cloud nicht erreichbar (lokal gesichert)');return}
+  const r=data&&data.data;
+  if(!r){await pushNow();return}
+  if(r.v===1&&(r.ts||0)>(S.ts||0)){S=r;try{localStorage.setItem('dz-state',JSON.stringify(S))}catch(e){}render()}
+  else if((S.ts||0)>(r.ts||0)){await pushNow();return}
+  status('In der Cloud gespeichert')}
+function showAuth(msg,mail){$('#auth').innerHTML=`<form id="f-auth"><h2>Dozenten-Cockpit</h2><p class="muted" style="margin:0">Melde dich an, damit deine Daten auf allen Geräten gleich sind.</p>${msg?`<div class="warn" style="margin:0">${esc(msg)}</div>`:''}
+  <label>E-Mail<input type="email" name="email" autocomplete="username" value="${esc(mail||'')}" required></label>
+  <label>Passwort<input type="password" name="pw" autocomplete="current-password" minlength="8" required></label>
+  <button class="btn pri">Anmelden</button><button type="button" class="btn" data-act="signup">Neu registrieren</button>
+  <button type="button" class="btn sm" data-act="localOnly">Ohne Anmeldung nur lokal nutzen</button></form>`;$('#auth').classList.add('show')}
+function hideAuth(){$('#auth').classList.remove('show');$('#auth').innerHTML=''}
+async function doLogin(d){status('Anmeldung…');const{error}=await SB.auth.signInWithPassword({email:d.email.trim(),password:d.pw});if(error)showAuth('Anmeldung fehlgeschlagen: '+error.message,d.email)}
+async function doSignup(){const f=$('#f-auth');if(!f.reportValidity())return;const d=Object.fromEntries(new FormData(f));
+  const{data,error}=await SB.auth.signUp({email:d.email.trim(),password:d.pw});
+  if(error)showAuth('Registrierung fehlgeschlagen: '+error.message,d.email);
+  else if(!data.session)showAuth('Bestätigungs-Mail gesendet. Bestätige die Adresse und melde dich danach an.',d.email)}
 
 /* Kopf */
 function renderHead(){
@@ -205,6 +239,7 @@ function vSettings(){
   ${f('hinweis','Steuerhinweis','text','class="wide"')}${f('ziel','Zahlungsziel (Tage)','number')}${f('zweck','Verwendungszweck-Zusatz')}${f('nextNr','Nächste Rechnungsnummer')}</div>
   <h2 style="margin-top:10px">Auftraggeber</h2><div id="clients">${S.clients.map(c=>`<div class="grid grp" data-cid="${esc(c.id)}"><label>Name<input data-k="name" value="${esc(c.name)}" required></label><label>Anschrift<textarea data-k="addr">${esc(c.addr)}</textarea></label><label>Satz (€ je UStd.)<input data-k="rate" type="number" step="0.01" value="${esc(c.rate)}"></label><div class="row" style="align-self:end">${S.entries.some(e=>e.client===c.id)?'<span class="muted">wird verwendet</span>':`<button type="button" class="btn sm" data-act="delClient" data-id="${esc(c.id)}" data-confirm>Entfernen</button>`}</div></div>`).join('')}</div>
   <div class="row"><button type="button" class="btn" data-act="addClient">Auftraggeber hinzufügen</button><button class="btn pri">Speichern</button></div></form>
+  ${USER?`<section class="card"><h2>Konto</h2><p class="muted">Angemeldet als ${esc(USER.email)}. Deine Daten werden in der Cloud gespeichert und auf allen Geräten synchronisiert.</p><button class="btn" data-act="logout">Abmelden</button></section>`:''}
   <section class="card"><h2>Sicherung</h2><p class="muted">Kopiert alle Daten als Text, z. B. für Google Drive. Einfügen und Importieren ersetzt den aktuellen Stand.</p>
   <div class="row" style="margin-bottom:12px"><button class="btn" data-act="copy">Daten kopieren</button></div>
   <label>Daten einfügen<textarea id="imp" placeholder="Gesicherten Text hier einfügen"></textarea></label><div class="row" style="margin-top:10px"><button class="btn" data-act="import" data-confirm>Importieren</button></div></section>`;
@@ -278,6 +313,9 @@ const act={
   delLead:b=>{S.leads=S.leads.filter(s=>s.id!==b.dataset.id);commit('Entfernt')},
   addClient:()=>{saveMe(false);S.clients.push({id:uid(),name:'Neuer Auftraggeber',addr:'',rate:25});render()},
   delClient:b=>{saveMe(false);S.clients=S.clients.filter(c=>c.id!==b.dataset.id);commit('Auftraggeber entfernt')},
+  signup:()=>doSignup(),
+  localOnly:()=>{LOCAL_ONLY=true;hideAuth();status('Lokal gespeichert')},
+  logout:async()=>{await SB.auth.signOut();try{localStorage.removeItem('dz-state')}catch(e){}location.reload()},
   copy:async()=>{try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Daten kopiert')}catch(e){toast('Kopieren nicht möglich')}},
   import:()=>{try{const x=JSON.parse($('#imp').value);if(x.v!==1||!Array.isArray(x.entries))throw 0;S=x;commit('Daten importiert')}catch(e){toast('Text ist keine gültige Sicherung')}}
 };
@@ -298,7 +336,8 @@ document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Obj
     S.last={client:d.client,leistung:d.leistung.trim(),ue:+d.ue};commit('Eingetragen: '+num(d.ue)+' UStd.')}
   if(f.id==='f-student'){S.students.push({id:uid(),name:d.name.trim(),kurs:d.kurs.trim(),exam:d.exam,focus:d.focus.trim(),next:d.next});commit('Hinzugefügt')}
   if(f.id==='f-lead'){S.leads.push({id:uid(),org:d.org.trim(),contact:d.contact.trim(),status:d.status,date:d.date,next:d.next.trim()});commit('Hinzugefügt')}
-  if(f.id==='f-me')saveMe(true)});
+  if(f.id==='f-me')saveMe(true);
+  if(f.id==='f-auth')doLogin(d)});
 document.addEventListener('change',e=>{const x=e.target;
   if(x.matches('#f-entry [name=client]'))$('#f-entry [name=rate]').value=client(x.value).rate;
   if(x.matches('#f-entry [name=student]')){const p=[...S.entries].reverse().find(en=>en.student===x.value.trim());if(p)$('#f-entry [name=g]').value=p.g}
@@ -307,6 +346,9 @@ document.addEventListener('change',e=>{const x=e.target;
     $(`[data-lbl="${CSS.escape(c)}"]`).textContent=eur(sum(S.entries.filter(en=>ids.includes(en.id)),en=>en.ue*en.rate))}});
 window.addEventListener('hashchange',()=>{try{localStorage.setItem('dz-tab',tab())}catch(e){}render();window.scrollTo(0,0)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MODAL)closeModal()});
-render();status('Lokal gespeichert');
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&USER&&!CT)pull()});
+render();
+if(SB){status('Anmeldung prüfen…');SB.auth.onAuthStateChange((ev,sess)=>{USER=sess?sess.user:null;if(USER){hideAuth();setTimeout(pull,0);if(MODAL||tab()==='einstellungen')render()}else if(!LOCAL_ONLY)showAuth()})}
+else status('Lokal gespeichert (Cloud nicht verfügbar)');
 }
 </script></body></html>
