@@ -74,13 +74,31 @@ details summary{cursor:pointer;font-weight:700;padding:8px 0}
 #modal{position:fixed;inset:0;background:rgba(8,30,26,.6);display:none;overflow-y:auto;padding:20px 12px;z-index:9}
 #modal.show{display:block}
 .mbar{max-width:800px;margin:0 auto 12px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-.paper{max-width:800px;margin:0 auto;background:#fff;color:#111;border-radius:6px;padding:clamp(20px,5vw,56px);font-size:14px;line-height:1.5}
-.paper h1{font-size:28px;color:#146155;margin-bottom:18px}.paper p{margin:0}.paper .gap{height:16px}
-.paper table{font-size:13px;margin:12px 0}.paper th{background:#1f8a78;color:#fff;font-weight:700}.paper td,.paper th{border-color:#d9e6e3}
-.paper table.meta{width:auto;margin:0}.meta td{border:0;padding:2px 24px 2px 0}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 18px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:10}
 .toast.show{opacity:1}
 pre,.scroll{overflow-x:auto}
+.paper{max-width:800px;margin:0 auto;background:#fff;color:#1c2430;border-radius:6px;font-size:14px;line-height:1.5;overflow:hidden}
+.paper p{margin:0}.paper .pbar{height:8px;background:#1f8a78}.paper .pin{padding:clamp(18px,5vw,48px)}
+.paper .ph{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.paper .pname{font:700 24px/1.1 "Red Hat Display",system-ui,sans-serif;color:#146155}.paper .psub{color:#5d6b78;font-size:13px;margin-top:5px}
+.paper .padr{text-align:right;color:#5d6b78;font-size:12.5px;line-height:1.6}
+.paper .pmid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr);gap:24px;margin-top:28px;align-items:start}
+.paper .psend{display:inline-block;font-size:9.5px;color:#5d6b78;border-bottom:1px solid #d6dedc;padding-bottom:3px;margin-bottom:10px}
+.paper .pinfo{background:#e8f1ef;border-radius:12px;padding:14px 18px;display:grid;gap:8px}
+.paper .pinfo div{display:flex;justify-content:space-between;gap:12px;font-size:13px}.paper .pinfo span{color:#5d6b78}.paper .pinfo b{text-align:right}
+.paper mark{background:#fff3cd;color:#5c4500;padding:0 5px;border-radius:3px}
+.paper h1{font-size:30px;color:#146155;margin:26px 0 12px}
+.paper table.pt{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:14px}
+.paper .pt th{background:#1f8a78;color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:11px 8px;border:0}
+.paper .pt td{padding:12px 8px;border-bottom:1px solid #d6dedc;vertical-align:top}.paper .pt .sub{display:block;font-size:11.5px;color:#5d6b78;margin-top:3px}
+.paper .ptot{display:flex;justify-content:flex-end;margin-top:18px}
+.paper .ptot div{background:#e8f1ef;border-left:4px solid #146155;padding:12px 18px;display:flex;gap:28px;align-items:baseline;border-radius:0 4px 4px 0}
+.paper .ptot span{font-size:10.5px;letter-spacing:.1em;color:#5d6b78;text-transform:uppercase}.paper .ptot b{font:700 20px "Red Hat Display",system-ui,sans-serif;color:#146155}
+.paper .ppay{border:1px solid #d6dedc;border-radius:12px;padding:16px 20px;margin-top:18px}
+.paper .ppay h3{font:700 10.5px "Red Hat Text",sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#146155}.paper .ppay p{margin:6px 0 12px;color:#5d6b78}
+.paper .ppay dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 28px;margin:0}.paper .ppay dt{color:#5d6b78}.paper .ppay dd{margin:0;font-weight:700;overflow-wrap:anywhere}
+.paper .pfoot{display:flex;justify-content:space-between;gap:6px 14px;flex-wrap:wrap;border-top:1px solid #d6dedc;margin-top:30px;padding-top:10px;font-size:11px;color:#5d6b78}
+@media(max-width:600px){.paper .pmid{grid-template-columns:minmax(0,1fr)}.paper .padr{text-align:left}.paper table.pt{font-size:12px}.paper .pt th,.paper .pt td{padding:8px 5px}.paper .ppay dl{gap:6px 14px}}
 #auth{position:fixed;inset:0;background:var(--band);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;overflow-y:auto}
 #auth.show{display:flex}
 #auth form{background:var(--panel);border-radius:16px;padding:26px;max-width:380px;width:100%;display:grid;gap:14px}
@@ -260,24 +278,29 @@ function bill(cid,ym){
 }
 function renderModal(){
   const i=S.invoices.find(x=>x.id===MODAL);if(!i){closeModal();return}
-  const me=i.from||S.me,miss=[!me.steuernr&&'Steuernummer',!me.iban&&'IBAN'].filter(Boolean);
+  const me=i.from||S.me,miss=[!me.steuernr&&'Steuernummer',!me.iban&&'IBAN'].filter(Boolean);const[cn,...rs]=i.client.name.split(' – ');
   $('#modal').innerHTML=`<div class="mbar"><button class="btn acc" data-act="pdf">PDF herunterladen</button><button class="btn" data-act="close">Schließen</button></div>
   <div style="max-width:800px;margin:0 auto">${miss.length?`<div class="warn">${miss.join(' und ')} fehlt noch. Unter Einstellungen eintragen, dann die Rechnung stornieren und neu erstellen.</div>`:''}</div>
-  <article class="paper"><h1>Rechnung</h1><p><b>${esc(me.name)}</b></p><p>${esc(me.street)} · ${esc(me.city)}</p><p>E-Mail: ${esc(me.email)}</p><p>Tel.: ${esc(me.tel)}</p><p>Steuernummer: ${esc(me.steuernr||'—')}</p><div class="gap"></div>
-  <p><b>Rechnungsempfänger</b></p><p>${esc(i.client.name)}</p>${i.client.addr.split('\n').map(l=>`<p>${esc(l)}</p>`).join('')}<div class="gap"></div>
-  <table class="meta"><tr><td><b>Rechnungsnummer</b></td><td>${esc(i.nr)}</td></tr><tr><td><b>Rechnungsdatum</b></td><td>${de(i.date)}</td></tr><tr><td><b>Leistungszeitraum</b></td><td>${esc(period(i))}</td></tr></table><div class="gap"></div>
-  <p>Sehr geehrte Damen und Herren,</p><p>für meine Dozententätigkeit erlaube ich mir, folgende Leistungen in Rechnung zu stellen:</p>
-  <table class="stack"><thead><tr><th>Pos.</th><th>Leistung</th><th>Menge</th><th class="r">Einzelpreis</th><th class="r">Gesamt</th></tr></thead><tbody>
-  ${i.items.map((t,k)=>`<tr><td>${k+1}</td><td>${esc(t.text)}</td><td>${menge(t.ue)}</td><td class="r">${eur(t.rate)}</td><td class="r">${eur(t.ue*t.rate)}</td></tr>`).join('')}
-  <tr><td></td><td></td><td></td><td class="r"><b>Rechnungsbetrag</b></td><td class="r"><b>${eur(i.total)}</b></td></tr></tbody></table>
-  <p><b>Steuerhinweis:</b> ${esc(me.hinweis)}</p><div class="gap"></div><p><b>Zahlungsbedingungen</b></p><p>Bitte überweisen Sie den Rechnungsbetrag innerhalb von ${esc(me.ziel)} Tagen ohne Abzug auf folgendes Konto:</p>
-  <p><b>Kontoinhaber: ${esc(me.name)}</b></p><p><b>IBAN: ${esc(me.iban||'—')}</b></p><p><b>Verwendungszweck: ${esc(zweck(i))}</b></p><div class="gap"></div>
-  <p>Vielen Dank für die gute Zusammenarbeit.</p><div class="gap"></div><p>Mit freundlichen Grüßen</p><p>${esc(me.name)}</p></article>`;
+  <article class="paper"><div class="pbar"></div><div class="pin">
+  <div class="ph"><div><div class="pname">${esc(me.name)}</div><div class="psub">${esc(me.untertitel||'Dozent · IHK-Weiterbildung')}</div></div><div class="padr">${[me.street,me.city,me.email,me.tel].map(s=>`<div>${esc(s)}</div>`).join('')}</div></div>
+  <div class="pmid"><div><span class="psend">${esc(me.name)} · ${esc(me.street)} · ${esc(me.city)}</span><div><b>${esc(cn)}</b></div>${[...(rs.length?[rs.join(' – ')]:[]),...i.client.addr.split('\n')].filter(s=>s.trim()).map(s=>`<div>${esc(s)}</div>`).join('')}</div>
+   <div class="pinfo"><div><span>Rechnungsnummer</span><b>${esc(i.nr)}</b></div><div><span>Rechnungsdatum</span><b>${de(i.date)}</b></div><div><span>Leistungszeitraum</span><b>${esc(periodShort(i))}</b></div><div><span>Steuernummer</span><b>${me.steuernr?esc(me.steuernr):'<mark>[Steuernummer]</mark>'}</b></div></div></div>
+  <h1>Rechnung</h1>
+  <p>Sehr geehrte Damen und Herren,<br>für meine Dozententätigkeit erlaube ich mir, folgende Leistungen in Rechnung zu stellen:</p>
+  <table class="pt"><thead><tr><th style="text-align:left">Pos.</th><th style="text-align:left">Leistung</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Gesamt</th></tr></thead><tbody>
+  ${i.items.map((t,k)=>{const x=itemParts(t);return `<tr><td>${k+1}</td><td>${esc(x.main)}${x.sub?`<span class="sub">${esc(x.sub)}</span>`:''}</td><td class="r">${num(t.ue)} Std.</td><td class="r">${eur(t.rate)}</td><td class="r">${eur(t.ue*t.rate)}</td></tr>`}).join('')}</tbody></table>
+  <div class="ptot"><div><span>Rechnungsbetrag</span><b>${eur(i.total)}</b></div></div>
+  <p style="margin-top:16px"><b>Steuerhinweis:</b> ${esc(me.hinweis)}</p>
+  <div class="ppay"><h3>Zahlungsbedingungen</h3><p>Bitte überweisen Sie den Rechnungsbetrag innerhalb von ${esc(me.ziel)} Tagen ohne Abzug auf folgendes Konto:</p><dl><dt>Kontoinhaber</dt><dd>${esc(me.name)}</dd><dt>IBAN</dt><dd>${esc(fmtIban(me.iban))}</dd><dt>Verwendungszweck</dt><dd>${esc(zweck(i))}</dd></dl></div>
+  <p style="margin-top:22px">Vielen Dank für die gute Zusammenarbeit.</p><p style="margin-top:14px">Mit freundlichen Grüßen</p><p style="margin-top:10px"><b>${esc(me.name)}</b></p>
+  <div class="pfoot"><span>${esc(me.name)} · ${esc(me.street)} · ${esc(me.city)}</span><span>${esc(me.email)} · ${esc(me.tel)}</span><span>Rechnung ${esc(i.nr)}</span></div></div></article>`;
   $('#modal').classList.add('show');loadPdf().catch(()=>{});
 }
 function closeModal(){MODAL=null;$('#modal').classList.remove('show');$('#modal').innerHTML=''}
 let pdfP=null;
 function loadPdf(){if(window.jspdf)return Promise.resolve();return pdfP||(pdfP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=()=>{pdfP=null;rej()};document.head.appendChild(s)}))}
+const periodShort=i=>i.period[0]===i.period[1]?de(i.period[0]):(i.period[0].slice(0,4)===i.period[1].slice(0,4)?de(i.period[0]).slice(0,6):de(i.period[0]))+' – '+de(i.period[1]);
+const fmtIban=s=>(s||'—').replace(/\s+/g,'').replace(/(.{4})/g,'$1 ').trim();
 function itemParts(it){
   if(it.leistung)return{main:it.leistung,sub:[de(it.date),it.student?(it.g==='w'?'Schülerin: ':'Schüler: ')+it.student:''].filter(Boolean).join(' · ')};
   const m=String(it.text).match(/^(.*), (\d{2}\.\d{2}\.\d{4})(?:, (Schülerin|Schüler): (.*))?$/);
@@ -290,7 +313,7 @@ async function makePdf(i){
   const t=(s,x,y,o)=>d.text(String(s),x,y,o),B=()=>d.setFont('helvetica','bold'),N=()=>d.setFont('helvetica','normal'),sz=n=>d.setFontSize(n);
   const sp=(s,x,y,cs,right)=>{s=String(s);const w=d.getTextWidth(s)+cs*(s.length-1);d.text(s,right?x-w:x,y,{charSpace:cs})};
   const topbar=()=>{fill(C.acc);d.rect(0,0,210,6,'F')};
-  const per=i.period[0]===i.period[1]?de(i.period[0]):(i.period[0].slice(0,4)===i.period[1].slice(0,4)?de(i.period[0]).slice(0,6):de(i.period[0]))+' – '+de(i.period[1]);
+  const per=periodShort(i);
   topbar();
   /* Briefkopf */
   B();sz(17);col(C.dark);t(me.name,L,22.2);
@@ -331,7 +354,7 @@ async function makePdf(i){
   B();sz(9.5);col(C.ink);t('Steuerhinweis:',L,y);const w1=d.getTextWidth('Steuerhinweis: ');N();const hl=d.splitTextToSize(me.hinweis||'',R-L-w1);hl.forEach((s,j)=>t(s,L+w1,y+j*4.6));y+=(hl.length-1)*4.6+6.9;
   /* Zahlungsbedingungen */
   N();sz(9.5);const para=d.splitTextToSize('Bitte überweisen Sie den Rechnungsbetrag innerhalb von '+me.ziel+' Tagen ohne Abzug auf folgendes Konto:',150);
-  const iban=(me.iban||'—').replace(/\s+/g,'').replace(/(.{4})/g,'$1 ').trim();
+  const iban=fmtIban(me.iban);
   B();sz(10);const rows=[['Kontoinhaber',[me.name]],['IBAN',[iban]],['Verwendungszweck',d.splitTextToSize(zweck(i),118)]];
   let yr=13.6+(para.length-1)*4.9+9.7;const pos=[];rows.forEach(r=>{pos.push(yr);yr+=(r[1].length-1)*4.4+7.2});const bh=yr-7.2+6.8;
   if(y+bh>272){d.addPage();topbar();y=20}
