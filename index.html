@@ -234,7 +234,7 @@ function vAkquise(){
 function vSettings(){
   const m=S.me,f=(k,l,t='text',x='')=>`<label ${x}>${l}<input type="${t}" name="${k}" value="${esc(m[k])}"></label>`;
   return `<form id="f-me" class="card"><h2>Absender auf Rechnungen</h2><div class="grid">
-  ${f('name','Name')}${f('street','Straße')}${f('city','PLZ Ort')}${f('email','E-Mail','email')}${f('tel','Telefon','tel')}${f('steuernr','Steuernummer')}${f('iban','IBAN','text','class="wide"')}
+  ${f('name','Name')}${f('untertitel','Untertitel im Briefkopf (z. B. Dozent · IHK-Weiterbildung)')}${f('street','Straße')}${f('city','PLZ Ort')}${f('email','E-Mail','email')}${f('tel','Telefon','tel')}${f('steuernr','Steuernummer')}${f('iban','IBAN','text','class="wide"')}
   ${f('hinweis','Steuerhinweis','text','class="wide"')}${f('ziel','Zahlungsziel (Tage)','number')}${f('zweck','Verwendungszweck-Zusatz')}${f('nextNr','Start-Rechnungsnummer (z. B. 2026-001)')}</div>
   <h2 style="margin-top:10px">Auftraggeber</h2><div id="clients">${S.clients.map(c=>`<div class="grid grp" data-cid="${esc(c.id)}"><label>Name<input data-k="name" value="${esc(c.name)}" required></label><label>Anschrift<textarea data-k="addr">${esc(c.addr)}</textarea></label><label>Satz (€ je UStd.)<input data-k="rate" type="number" step="0.01" value="${esc(c.rate)}"></label><div class="row" style="align-self:end">${S.entries.some(e=>e.client===c.id)?'<span class="muted">wird verwendet</span>':`<button type="button" class="btn sm" data-act="delClient" data-id="${esc(c.id)}" data-confirm>Entfernen</button>`}</div></div>`).join('')}</div>
   <div class="row"><button type="button" class="btn" data-act="addClient">Auftraggeber hinzufügen</button><button class="btn pri">Speichern</button></div></form>
@@ -255,7 +255,7 @@ function bill(cid,ym){
   const es=S.entries.filter(e=>!e.inv&&e.client===cid&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));
   if(!es.length){toast('Keine offenen Stunden gefunden');return}
   const c=client(cid),nr=nextNr(),id=uid();
-  const inv={id,nr,date:today(),client:{name:c.name,addr:c.addr},from:{...S.me},items:es.map(e=>({text:lineText(e),ue:+e.ue,rate:+e.rate})),period:[es[0].date,es[es.length-1].date],total:Math.round(sum(es,e=>e.ue*e.rate)*100)/100,paid:false};
+  const inv={id,nr,date:today(),client:{name:c.name,addr:c.addr},from:{...S.me},items:es.map(e=>({text:lineText(e),leistung:e.leistung,date:e.date,student:e.student,g:e.g,ue:+e.ue,rate:+e.rate})),period:[es[0].date,es[es.length-1].date],total:Math.round(sum(es,e=>e.ue*e.rate)*100)/100,paid:false};
   es.forEach(e=>e.inv=id);S.invoices.push(inv);MODAL=id;commit('Rechnung '+nr+' erstellt');
 }
 function renderModal(){
@@ -278,23 +278,76 @@ function renderModal(){
 function closeModal(){MODAL=null;$('#modal').classList.remove('show');$('#modal').innerHTML=''}
 let pdfP=null;
 function loadPdf(){if(window.jspdf)return Promise.resolve();return pdfP||(pdfP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=()=>{pdfP=null;rej()};document.head.appendChild(s)}))}
+function itemParts(it){
+  if(it.leistung)return{main:it.leistung,sub:[de(it.date),it.student?(it.g==='w'?'Schülerin: ':'Schüler: ')+it.student:''].filter(Boolean).join(' · ')};
+  const m=String(it.text).match(/^(.*), (\d{2}\.\d{2}\.\d{4})(?:, (Schülerin|Schüler): (.*))?$/);
+  return m?{main:m[1],sub:m[2]+(m[4]?' · '+m[3]+': '+m[4]:'')}:{main:String(it.text),sub:''}}
 async function makePdf(i){
-  await loadPdf();const d=new window.jspdf.jsPDF({unit:'mm',format:'a4'});const me=i.from||S.me,L=20,R=190,e=n=>fx(n)+' €';let y=24;d.setFillColor(31,138,120);d.rect(0,0,210,5,'F');d.setTextColor(28,36,48);
-  const t=(s,x,yy,o)=>d.text(String(s),x,yy,o),B=()=>d.setFont('helvetica','bold'),N=()=>d.setFont('helvetica','normal');
-  const brk=h=>{if(y+h>275){d.addPage();y=24}};
-  d.setTextColor(20,97,85);B();d.setFontSize(20);t('Rechnung',L,y);d.setTextColor(28,36,48);y+=11;d.setFontSize(10);t(me.name,L,y);y+=5;N();
-  [me.street+' · '+me.city,'E-Mail: '+me.email,'Tel.: '+me.tel,'Steuernummer: '+(me.steuernr||'—')].forEach(s=>{t(s,L,y);y+=5});
-  y+=6;B();t('Rechnungsempfänger',L,y);y+=5;N();[i.client.name,...i.client.addr.split('\n')].filter(s=>s.trim()).forEach(s=>{t(s,L,y);y+=5});
-  y+=6;[['Rechnungsnummer',i.nr],['Rechnungsdatum',de(i.date)],['Leistungszeitraum',period(i)]].forEach(([k,v])=>{B();t(k,L,y);N();t(v,L+45,y);y+=6});
-  y+=6;t('Sehr geehrte Damen und Herren,',L,y);y+=6;d.text(d.splitTextToSize('für meine Dozententätigkeit erlaube ich mir, folgende Leistungen in Rechnung zu stellen:',R-L),L,y);y+=9;
-  d.setFontSize(9.5);d.setFillColor(31,138,120);d.rect(L,y-4.6,R-L,7,'F');B();d.setTextColor(255,255,255);t('Pos.',L+1,y);t('Leistung',L+10,y);t('Menge',L+96,y);t('Einzelpreis',L+148,y,{align:'right'});t('Gesamt',R-1,y,{align:'right'});d.setTextColor(28,36,48);y+=7.5;N();d.setDrawColor(217,230,227);
-  i.items.forEach((it,k)=>{const ln=d.splitTextToSize(it.text,82),h=ln.length*4.4;brk(h+3);t(k+1,L+1,y);d.text(ln,L+10,y);t(menge(it.ue),L+96,y);t(e(it.rate),L+148,y,{align:'right'});t(e(it.ue*it.rate),R-1,y,{align:'right'});y+=h+1.6;d.line(L,y-2.6,R,y-2.6);y+=2});
-  y+=2;d.setFillColor(207,227,223);d.rect(L+104,y-5,R-L-104,8,'F');d.setTextColor(20,97,85);B();t('Rechnungsbetrag',L+148,y,{align:'right'});t(e(i.total),R-1,y,{align:'right'});d.setTextColor(28,36,48);y+=13;d.setFontSize(10);
-  brk(70);B();t('Steuerhinweis:',L,y);const w1=d.getTextWidth('Steuerhinweis: ');N();t(me.hinweis,L+w1,y);y+=9;
-  const zb=d.splitTextToSize('Bitte überweisen Sie den Rechnungsbetrag innerhalb von '+me.ziel+' Tagen ohne Abzug auf folgendes Konto:',R-L);
-  B();t('Zahlungsbedingungen',L,y);y+=5;N();d.text(zb,L,y);y+=zb.length*5+2;
-  B();['Kontoinhaber: '+me.name,'IBAN: '+(me.iban||'—'),'Verwendungszweck: '+zweck(i)].forEach(s=>{d.text(d.splitTextToSize(s,R-L),L,y);y+=5});N();
-  y+=7;t('Vielen Dank für die gute Zusammenarbeit.',L,y);y+=10;t('Mit freundlichen Grüßen',L,y);y+=6;t(me.name,L,y);
+  await loadPdf();const d=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+  const me=i.from||S.me,L=20,R=190,e=n=>fx(n)+' €';
+  const C={dark:[20,97,85],acc:[31,138,120],tint:[232,241,239],ink:[28,36,48],mute:[93,107,120],line:[214,222,220],white:[255,255,255]};
+  const col=a=>d.setTextColor(a[0],a[1],a[2]),fill=a=>d.setFillColor(a[0],a[1],a[2]),stroke=a=>d.setDrawColor(a[0],a[1],a[2]);
+  const t=(s,x,y,o)=>d.text(String(s),x,y,o),B=()=>d.setFont('helvetica','bold'),N=()=>d.setFont('helvetica','normal'),sz=n=>d.setFontSize(n);
+  const sp=(s,x,y,cs,right)=>{s=String(s);const w=d.getTextWidth(s)+cs*(s.length-1);d.text(s,right?x-w:x,y,{charSpace:cs})};
+  const topbar=()=>{fill(C.acc);d.rect(0,0,210,6,'F')};
+  const per=i.period[0]===i.period[1]?de(i.period[0]):(i.period[0].slice(0,4)===i.period[1].slice(0,4)?de(i.period[0]).slice(0,6):de(i.period[0]))+' – '+de(i.period[1]);
+  topbar();
+  /* Briefkopf */
+  B();sz(17);col(C.dark);t(me.name,L,22.2);
+  N();sz(9);col(C.mute);t(me.untertitel||'Dozent · IHK-Weiterbildung',L,28.2);
+  sz(8.5);[me.street,me.city,me.email,me.tel].forEach((s,k)=>t(s,R,19+k*4.9,{align:'right'}));
+  /* Absenderzeile und Empfänger */
+  const sl=me.name+' · '+me.street+' · '+me.city;sz(6.5);col(C.mute);t(sl,L,45.8);stroke(C.line);d.setLineWidth(.2);d.line(L,48.2,L+Math.max(55,d.getTextWidth(sl)),48.2);
+  const[cn,...rs]=i.client.name.split(' – ');
+  const rl=[...(rs.length?[rs.join(' – ')]:[]),...i.client.addr.split('\n')].filter(s=>s.trim());
+  B();sz(10);col(C.ink);const cnl=d.splitTextToSize(cn,88);cnl.forEach((s,k)=>t(s,L,55.6+k*5.1));
+  N();let ry=60.7+(cnl.length-1)*5.1;rl.forEach(s=>d.splitTextToSize(s,88).forEach(x=>{t(x,L,ry);ry+=5.1}));
+  /* Infobox */
+  fill(C.tint);d.roundedRect(115.8,42.7,74.2,35.3,3,3,'F');
+  [['Rechnungsnummer',i.nr],['Rechnungsdatum',de(i.date)],['Leistungszeitraum',per],['Steuernummer',me.steuernr||null]].forEach(([k,v],n)=>{const y=51.5+n*6.6;
+    N();sz(8.5);col(C.mute);t(k,121.9,y);B();sz(9);col(C.ink);
+    if(v===null){const s='[Steuernummer]',w=d.getTextWidth(s);fill([255,243,205]);d.rect(183.9-w-1,y-3.2,w+2,4.6,'F');col([92,69,0]);t(s,183.9,y,{align:'right'})}
+    else t(v,183.9,y,{align:'right'})});
+  /* Titel und Anrede */
+  B();sz(22);col(C.dark);t('Rechnung',L,92.2);
+  N();sz(10);col(C.ink);t('Sehr geehrte Damen und Herren,',L,102.4);t('für meine Dozententätigkeit erlaube ich mir, folgende Leistungen in Rechnung zu stellen:',L,107.4);
+  /* Tabelle */
+  let y=114;
+  const head=yy=>{fill(C.acc);d.rect(L,yy,R-L,9.2,'F');B();sz(7);col(C.white);sp('POS.',22.9,yy+5.4,.35);sp('LEISTUNG',36.3,yy+5.4,.35);sp('MENGE',137.6,yy+5.4,.35,true);sp('EINZELPREIS',165.8,yy+5.4,.35,true);sp('GESAMT',186.6,yy+5.4,.35,true)};
+  head(y);y+=9.2;stroke(C.line);d.setLineWidth(.25);
+  i.items.forEach((it,k)=>{const x=itemParts(it);N();sz(10);const ml=d.splitTextToSize(x.main,86);sz(8);const sb=x.sub?d.splitTextToSize(x.sub,86):[];
+    const h=6.8+(ml.length-1)*4.4+(sb.length?5.5+(sb.length-1)*3.8+4.5:4.6);
+    if(y+h>268){d.addPage();topbar();y=20;head(y);y+=9.2;stroke(C.line);d.setLineWidth(.25)}
+    N();sz(10);col(C.mute);t(k+1,22.9,y+6.8);col(C.ink);ml.forEach((s,j)=>t(s,36.3,y+6.8+j*4.4));
+    t(num(it.ue)+' Std.',137.6,y+6.8,{align:'right'});t(e(it.rate),165.8,y+6.8,{align:'right'});t(e(it.ue*it.rate),186.6,y+6.8,{align:'right'});
+    if(sb.length){sz(8);col(C.mute);sb.forEach((s,j)=>t(s,36.3,y+6.8+(ml.length-1)*4.4+5.5+j*3.8))}
+    y+=h;d.line(L,y,R,y)});
+  /* Rechnungsbetrag */
+  y+=4.1;if(y+14>270){d.addPage();topbar();y=20}
+  fill(C.tint);d.rect(110.7,y,79.3,13.5,'F');fill(C.dark);d.rect(110.7,y,1,13.5,'F');
+  B();sz(7.5);col(C.mute);sp('RECHNUNGSBETRAG',116.3,y+8,.4);sz(14);col(C.dark);t(e(i.total),184.9,y+8.7,{align:'right'});
+  y+=13.5+7.3;
+  /* Steuerhinweis */
+  B();sz(9.5);col(C.ink);t('Steuerhinweis:',L,y);const w1=d.getTextWidth('Steuerhinweis: ');N();const hl=d.splitTextToSize(me.hinweis||'',R-L-w1);hl.forEach((s,j)=>t(s,L+w1,y+j*4.6));y+=(hl.length-1)*4.6+6.9;
+  /* Zahlungsbedingungen */
+  N();sz(9.5);const para=d.splitTextToSize('Bitte überweisen Sie den Rechnungsbetrag innerhalb von '+me.ziel+' Tagen ohne Abzug auf folgendes Konto:',150);
+  const iban=(me.iban||'—').replace(/\s+/g,'').replace(/(.{4})/g,'$1 ').trim();
+  B();sz(10);const rows=[['Kontoinhaber',[me.name]],['IBAN',[iban]],['Verwendungszweck',d.splitTextToSize(zweck(i),118)]];
+  let yr=13.6+(para.length-1)*4.9+9.7;const pos=[];rows.forEach(r=>{pos.push(yr);yr+=(r[1].length-1)*4.4+7.2});const bh=yr-7.2+6.8;
+  if(y+bh>272){d.addPage();topbar();y=20}
+  stroke(C.line);d.setLineWidth(.3);d.roundedRect(L,y,R-L,bh,3,3,'S');
+  B();sz(7.5);col(C.dark);sp('ZAHLUNGSBEDINGUNGEN',26.2,y+6.9,.4);
+  N();sz(9.5);col(C.mute);para.forEach((s,j)=>t(s,26.2,y+13.6+j*4.9));
+  rows.forEach((r,k)=>{N();sz(10);col(C.mute);t(r[0],26.7,y+pos[k]);B();col(C.ink);r[1].forEach((s,j)=>t(s,65.3,y+pos[k]+j*4.4))});
+  y+=bh+8.7;
+  /* Schluss */
+  if(y+19>272){d.addPage();topbar();y=24}
+  N();sz(10);col(C.ink);t('Vielen Dank für die gute Zusammenarbeit.',L,y);y+=9.1;t('Mit freundlichen Grüßen',L,y);y+=9.9;B();t(me.name,L,y);
+  /* Fußzeile auf jeder Seite */
+  const np=d.getNumberOfPages();
+  for(let pg=1;pg<=np;pg++){d.setPage(pg);stroke(C.line);d.setLineWidth(.2);d.line(L,277.3,R,277.3);N();sz(7.5);col(C.mute);
+    const a=me.name+' · '+me.street+' · '+me.city,b=me.email+' · '+me.tel,c='Rechnung '+i.nr+(np>1?' · Seite '+pg+'/'+np:'');
+    t(a,L,283.2);t(c,R,283.2,{align:'right'});const free=(R-d.getTextWidth(c))-(L+d.getTextWidth(a));t(b,L+d.getTextWidth(a)+(free-d.getTextWidth(b))/2,283.2)}
   return d.output('blob');
 }
 
@@ -324,7 +377,7 @@ const act={
 };
 function saveMe(doCommit){
   const f=$('#f-me');if(!f)return;const d=new FormData(f);
-  for(const k of ['name','street','city','email','tel','steuernr','iban','hinweis','zweck','nextNr'])S.me[k]=String(d.get(k)||'').trim();
+  for(const k of ['name','untertitel','street','city','email','tel','steuernr','iban','hinweis','zweck','nextNr'])S.me[k]=String(d.get(k)||'').trim();
   S.me.ziel=+d.get('ziel')||14;
   for(const row of document.querySelectorAll('[data-cid]')){const c=S.clients.find(x=>x.id===row.dataset.cid);if(!c)continue;
     c.name=row.querySelector('[data-k=name]').value.trim();c.addr=row.querySelector('[data-k=addr]').value.trim();c.rate=+row.querySelector('[data-k=rate]').value||0}
