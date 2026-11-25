@@ -183,10 +183,8 @@ function renderHead(){
 function vStunden(){
   const L=S.last||{},c0=client(L.client||S.clients[0]?.id);
   const opts=S.clients.map(c=>`<option value="${esc(c.id)}" ${c.id===L.client?'selected':''}>${esc(c.name)}</option>`).join('');
-  const open=S.entries.filter(e=>!e.inv).sort((a,b)=>a.date.localeCompare(b.date));
-  const groups=S.clients.map(c=>[c,open.filter(e=>e.client===c.id)]).filter(g=>g[1].length);
-  const done=S.entries.filter(e=>e.inv).sort((a,b)=>b.date.localeCompare(a.date));
-  const months=[...new Set(done.map(e=>e.date.slice(0,7)))];
+  const all=[...S.entries].sort((a,b)=>b.date.localeCompare(a.date));
+  const months=[...new Set(all.map(e=>e.date.slice(0,7)))];
   return `<form id="f-entry" class="card"><h2>Stunden eintragen</h2><div class="grid">
    <label>Datum<input type="date" name="date" value="${today()}" required></label>
    <label>Auftraggeber<select name="client" required>${opts}</select></label>
@@ -197,22 +195,21 @@ function vStunden(){
    <label>Satz (€ je UStd.)<input type="number" name="rate" step="0.01" min="0" value="${esc(c0.rate)}" inputmode="decimal" required></label>
   </div><datalist id="dl-st">${S.students.map(s=>`<option value="${esc(s.name)}">`).join('')}</datalist>
   <button class="btn pri" ${S.clients.length?'':'disabled'}>Eintragen</button>${S.clients.length?'':' <span class="muted">Lege zuerst unter Einstellungen einen Auftraggeber an.</span>'}</form>
-  <section class="card"><h2>Noch nicht abgerechnet</h2>${groups.length?groups.map(([c,es])=>`<div class="grp">
-   <div class="spread"><h3>${esc(c.name)}</h3><button class="btn acc" data-act="bill" data-c="${esc(c.id)}">Rechnung erstellen · <span data-lbl="${esc(c.id)}">${eur(sum(es,e=>e.ue*e.rate))}</span></button></div>
-   <table class="stack"><thead><tr><th>Abrechnen</th><th>Datum</th><th>Schüler/in</th><th>Leistung</th><th class="r">UStd.</th><th class="r">Betrag</th><th></th></tr></thead><tbody>
-   ${es.map(e=>`<tr><td><input type="checkbox" checked data-sel="${esc(e.id)}" data-c="${esc(c.id)}" aria-label="abrechnen"></td><td class="nw">${de(e.date)}</td><td>${esc(e.student)}</td><td>${esc(e.leistung)}</td><td class="r">${num(e.ue)}</td><td class="r">${eur(e.ue*e.rate)}</td><td class="r"><button class="btn sm" data-act="delEntry" data-id="${esc(e.id)}" data-confirm>Löschen</button></td></tr>`).join('')}
-   </tbody></table></div>`).join(''):'<div class="empty">Alles abgerechnet. Neue Stunden erscheinen hier, bis du daraus eine Rechnung erstellst.</div>'}</section>
-  <section class="card"><h2>Abgerechnete Stunden</h2>${months.length?months.map((m,i)=>{const es=done.filter(e=>e.date.startsWith(m));return `<details ${i?'':'open'}><summary>${MON[+m.slice(5)-1]} ${m.slice(0,4)} · ${num(sum(es,e=>+e.ue))} UStd. · ${eur(sum(es,e=>e.ue*e.rate))}</summary>
-   <table class="stack"><thead><tr><th>Datum</th><th>Schüler/in</th><th>Auftraggeber</th><th class="r">UStd.</th><th class="r">Betrag</th><th>Rechnung</th><th></th></tr></thead><tbody>
-   ${es.map(e=>{const inv=S.invoices.find(x=>x.id===e.inv);return `<tr><td class="nw">${de(e.date)}</td><td>${esc(e.student)}</td><td>${esc(client(e.client).name)}</td><td class="r">${num(e.ue)}</td><td class="r">${eur(e.ue*e.rate)}</td><td>${inv?`<button class="btn sm" data-act="view" data-id="${esc(inv.id)}">${esc(inv.nr)}</button>`:''}</td><td class="r"><button class="btn sm" data-act="delEntry" data-id="${esc(e.id)}" data-confirm>Löschen</button></td></tr>`}).join('')}</tbody></table></details>`}).join(''):'<div class="empty">Noch keine abgerechneten Stunden.</div>'}</section>`;
+  <section class="card"><h2>Eingetragene Stunden</h2>${months.length?months.map((m,i)=>{const es=all.filter(e=>e.date.startsWith(m));return `<details ${i?'':'open'}><summary>${MON[+m.slice(5)-1]} ${m.slice(0,4)} · ${num(sum(es,e=>+e.ue))} UStd. · ${eur(sum(es,e=>e.ue*e.rate))}</summary>
+   <table class="stack"><thead><tr><th>Datum</th><th>Schüler/in</th><th>Auftraggeber</th><th class="r">UStd.</th><th class="r">Betrag</th><th>Status</th><th></th></tr></thead><tbody>
+   ${es.map(e=>{const inv=S.invoices.find(x=>x.id===e.inv);return `<tr><td class="nw">${de(e.date)}</td><td>${esc(e.student)}</td><td>${esc(client(e.client).name)}</td><td class="r">${num(e.ue)}</td><td class="r">${eur(e.ue*e.rate)}</td><td>${inv?`<button class="btn sm" data-act="view" data-id="${esc(inv.id)}">${esc(inv.nr)}</button>`:'<span class="tag open">Offen</span>'}</td><td class="r"><button class="btn sm" data-act="delEntry" data-id="${esc(e.id)}" data-confirm>Löschen</button></td></tr>`}).join('')}</tbody></table></details>`}).join('')+'<p class="muted">Rechnungen erstellst du im Reiter „Rechnungen“.</p>':'<div class="empty">Noch keine Stunden eingetragen.</div>'}</section>`;
 }
 function vRechnungen(){
   const inv=[...S.invoices].sort((a,b)=>b.nr.localeCompare(a.nr,'de',{numeric:true}));
-  return `<section class="card"><div class="spread"><h2 style="margin:0">Rechnungen</h2><span class="muted">Nächste Nummer: ${esc(nextNr())}</span></div>${inv.length?`<table class="stack"><thead><tr><th>Nr.</th><th>Datum</th><th>Empfänger</th><th>Zeitraum</th><th class="r">Betrag</th><th>Status</th><th></th></tr></thead><tbody>
+  const open=S.entries.filter(e=>!e.inv),keys=[...new Set(open.map(e=>e.client+'|'+e.date.slice(0,7)))].sort((a,b)=>b.split('|')[1].localeCompare(a.split('|')[1]));
+  const groups=keys.map(k=>{const[c,m]=k.split('|');return{c,m,es:open.filter(e=>e.client===c&&e.date.startsWith(m))}});
+  const ready=`<section class="card"><h2>Zur Abrechnung bereit</h2>${groups.length?`<table class="stack"><thead><tr><th>Monat</th><th>Auftraggeber</th><th class="r">Einträge</th><th class="r">UStd.</th><th class="r">Betrag</th><th></th></tr></thead><tbody>
+  ${groups.map(g=>`<tr><td class="nw"><b>${MON[+g.m.slice(5)-1]} ${g.m.slice(0,4)}</b></td><td>${esc(client(g.c).name)}</td><td class="r">${g.es.length}</td><td class="r">${num(sum(g.es,e=>+e.ue))}</td><td class="r">${eur(sum(g.es,e=>e.ue*e.rate))}</td><td class="r"><button class="btn acc sm" data-act="bill" data-c="${esc(g.c)}" data-m="${g.m}">Rechnung erstellen</button></td></tr>`).join('')}</tbody></table><p class="muted">Eine Rechnung fasst alle noch offenen Stunden eines Monats für einen Auftraggeber zusammen.</p>`:'<div class="empty">Alle Stunden sind abgerechnet. Neue Stunden trägst du im Reiter „Stunden“ ein.</div>'}</section>`;
+  return `${ready}<section class="card"><div class="spread"><h2 style="margin:0">Rechnungen</h2><span class="muted">Nächste Nummer: ${esc(nextNr())}</span></div>${inv.length?`<table class="stack"><thead><tr><th>Nr.</th><th>Datum</th><th>Empfänger</th><th>Zeitraum</th><th class="r">Betrag</th><th>Status</th><th></th></tr></thead><tbody>
   ${inv.map(i=>`<tr><td class="nw"><b>${esc(i.nr)}</b></td><td class="nw">${de(i.date)}</td><td>${esc(i.client.name)}</td><td>${esc(period(i))}</td><td class="r">${eur(i.total)}</td>
   <td><button class="btn sm" data-act="paid" data-id="${esc(i.id)}"><span class="tag ${i.paid?'ok':'open'}">${i.paid?'Bezahlt'+(i.paidDate?' '+de(i.paidDate):''):'Offen'}</span></button></td>
   <td class="r"><div class="row" style="justify-content:flex-end"><button class="btn sm" data-act="view" data-id="${esc(i.id)}">Ansehen</button><button class="btn sm" data-act="storno" data-id="${esc(i.id)}" data-confirm>Stornieren</button></div></td></tr>`).join('')}</tbody></table>
-  <p class="muted">Status antippen, um zwischen offen und bezahlt zu wechseln. Stornieren löscht die Rechnung und gibt die Stunden wieder zur Abrechnung frei.</p>`:'<div class="empty">Noch keine Rechnungen. Erstelle sie unter Stunden aus deinen Einträgen.</div>'}</section>`;
+  <p class="muted">Status antippen, um zwischen offen und bezahlt zu wechseln. Stornieren löscht die Rechnung und gibt die Stunden wieder zur Abrechnung frei.</p>`:'<div class="empty">Noch keine Rechnungen.</div>'}</section>`;
 }
 function vSchueler(){
   const t=today(),days=d=>Math.round((new Date(d)-new Date(t))/864e5);
@@ -251,10 +248,9 @@ function render(){renderHead();$('#view').innerHTML={stunden:vStunden,rechnungen
 /* Rechnungen */
 function nextNr(){let n=S.me.nextNr||'1';const y=today().slice(0,4);if(/^\d{4}-/.test(n)&&n.slice(0,4)!==y)n=y+'-001';return n}
 function incNr(n){const m=n.match(/^(.*?)(\d+)$/);return m?m[1]+String(+m[2]+1).padStart(m[2].length,'0'):n+'-2'}
-function bill(cid){
-  const ids=[...document.querySelectorAll(`[data-sel][data-c="${CSS.escape(cid)}"]:checked`)].map(x=>x.dataset.sel);
-  const es=S.entries.filter(e=>ids.includes(e.id)).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!es.length){toast('Keine Einträge ausgewählt');return}
+function bill(cid,ym){
+  const es=S.entries.filter(e=>!e.inv&&e.client===cid&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!es.length){toast('Keine offenen Stunden gefunden');return}
   const c=client(cid),nr=nextNr(),id=uid();
   const inv={id,nr,date:today(),client:{name:c.name,addr:c.addr},from:{...S.me},items:es.map(e=>({text:lineText(e),ue:+e.ue,rate:+e.rate})),period:[es[0].date,es[es.length-1].date],total:Math.round(sum(es,e=>e.ue*e.rate)*100)/100,paid:false};
   es.forEach(e=>e.inv=id);S.invoices.push(inv);S.me.nextNr=incNr(nr);MODAL=id;commit('Rechnung '+nr+' erstellt');
@@ -301,7 +297,7 @@ async function makePdf(i){
 
 /* Aktionen */
 const act={
-  bill:b=>bill(b.dataset.c),
+  bill:b=>bill(b.dataset.c,b.dataset.m),
   delEntry:b=>{S.entries=S.entries.filter(e=>e.id!==b.dataset.id);commit('Eintrag gelöscht')},
   view:b=>{MODAL=b.dataset.id;renderModal()},
   close:()=>closeModal(),
@@ -345,9 +341,7 @@ document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Obj
 document.addEventListener('change',e=>{const x=e.target;
   if(x.matches('#f-entry [name=client]'))$('#f-entry [name=rate]').value=client(x.value).rate;
   if(x.matches('#f-entry [name=student]')){const p=[...S.entries].reverse().find(en=>en.student===x.value.trim());if(p)$('#f-entry [name=g]').value=p.g}
-  if(x.dataset.lead){const l=S.leads.find(v=>v.id===x.dataset.lead);l.status=x.value;if(!l.date)l.date=today();commit('Status: '+x.value)}
-  if(x.dataset.sel){const c=x.dataset.c,ids=[...document.querySelectorAll(`[data-sel][data-c="${CSS.escape(c)}"]:checked`)].map(v=>v.dataset.sel);
-    $(`[data-lbl="${CSS.escape(c)}"]`).textContent=eur(sum(S.entries.filter(en=>ids.includes(en.id)),en=>en.ue*en.rate))}});
+  if(x.dataset.lead){const l=S.leads.find(v=>v.id===x.dataset.lead);l.status=x.value;if(!l.date)l.date=today();commit('Status: '+x.value)}});
 window.addEventListener('hashchange',()=>{try{localStorage.setItem('dz-tab',tab())}catch(e){}render();window.scrollTo(0,0)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MODAL)closeModal()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&USER&&!CT)pull()});
