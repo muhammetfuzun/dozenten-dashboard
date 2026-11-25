@@ -128,7 +128,7 @@ const lineText=e=>[e.leistung,de(e.date),e.student?(e.g==='w'?'Schülerin: ':'Sc
 const period=i=>i.period[0]===i.period[1]?de(i.period[0]):de(i.period[0])+' – '+de(i.period[1]);
 const menge=u=>num(u)+' Unterrichtsstunde'+(+u===1?'':'n');
 const zweck=i=>{const m=+i.period[1].slice(5,7)-1;return 'Rechnung '+i.nr+' – '+(i.from||S.me).zweck+', '+MON[m]+' '+i.period[1].slice(0,4)};
-function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2400)}
+function toast(t,ms){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),ms||2400)}
 function status(t){$('#status').textContent=t}
 function tab(){const h=location.hash.slice(1);if(TABS.includes(h))return h;try{const l=localStorage.getItem('dz-tab');if(TABS.includes(l))return l}catch(e){}return 'stunden'}
 
@@ -195,7 +195,7 @@ function vStunden(){
    <label>Satz (€ je UStd.)<input type="number" name="rate" step="0.01" min="0" value="${esc(c0.rate)}" inputmode="decimal" required></label>
   </div><datalist id="dl-st">${S.students.map(s=>`<option value="${esc(s.name)}">`).join('')}</datalist>
   <button class="btn pri" ${S.clients.length?'':'disabled'}>Eintragen</button>${S.clients.length?'':' <span class="muted">Lege zuerst unter Einstellungen einen Auftraggeber an.</span>'}</form>
-  <section class="card"><h2>Eingetragene Stunden</h2>${months.length?months.map((m,i)=>{const es=all.filter(e=>e.date.startsWith(m));return `<details ${i?'':'open'}><summary>${MON[+m.slice(5)-1]} ${m.slice(0,4)} · ${num(sum(es,e=>+e.ue))} UStd. · ${eur(sum(es,e=>e.ue*e.rate))}</summary>
+  <section class="card"><h2>Eingetragene Stunden</h2>${months.length?months.map((m,i)=>{const es=all.filter(e=>e.date.startsWith(m));return `<details ${i?'':'open'}><summary>${MON[+m.slice(5)-1]} ${m.slice(0,4)} · ${num(sum(es,e=>+e.ue))} UStd. · ${eur(sum(es,e=>e.ue*e.rate))}${(ids=>ids.length===1?' · '+(ids[0]?'Rechnung '+(S.invoices.find(x=>x.id===ids[0])||{nr:''}).nr:'Offen'):'')([...new Set(es.map(e=>e.inv||''))])}</summary>
    <table class="stack"><thead><tr><th>Datum</th><th>Schüler/in</th><th>Auftraggeber</th><th class="r">UStd.</th><th class="r">Betrag</th><th>Status</th><th></th></tr></thead><tbody>
    ${es.map(e=>{const inv=S.invoices.find(x=>x.id===e.inv);return `<tr><td class="nw">${de(e.date)}</td><td>${esc(e.student)}</td><td>${esc(client(e.client).name)}</td><td class="r">${num(e.ue)}</td><td class="r">${eur(e.ue*e.rate)}</td><td>${inv?`<button class="btn sm" data-act="view" data-id="${esc(inv.id)}">${esc(inv.nr)}</button>`:'<span class="tag open">Offen</span>'}</td><td class="r"><button class="btn sm" data-act="delEntry" data-id="${esc(e.id)}" data-confirm>Löschen</button></td></tr>`}).join('')}</tbody></table></details>`}).join('')+'<p class="muted">Rechnungen erstellst du im Reiter „Rechnungen“.</p>':'<div class="empty">Noch keine Stunden eingetragen.</div>'}</section>`;
 }
@@ -235,7 +235,7 @@ function vSettings(){
   const m=S.me,f=(k,l,t='text',x='')=>`<label ${x}>${l}<input type="${t}" name="${k}" value="${esc(m[k])}"></label>`;
   return `<form id="f-me" class="card"><h2>Absender auf Rechnungen</h2><div class="grid">
   ${f('name','Name')}${f('street','Straße')}${f('city','PLZ Ort')}${f('email','E-Mail','email')}${f('tel','Telefon','tel')}${f('steuernr','Steuernummer')}${f('iban','IBAN','text','class="wide"')}
-  ${f('hinweis','Steuerhinweis','text','class="wide"')}${f('ziel','Zahlungsziel (Tage)','number')}${f('zweck','Verwendungszweck-Zusatz')}${f('nextNr','Nächste Rechnungsnummer')}</div>
+  ${f('hinweis','Steuerhinweis','text','class="wide"')}${f('ziel','Zahlungsziel (Tage)','number')}${f('zweck','Verwendungszweck-Zusatz')}${f('nextNr','Start-Rechnungsnummer (z. B. 2026-001)')}</div>
   <h2 style="margin-top:10px">Auftraggeber</h2><div id="clients">${S.clients.map(c=>`<div class="grid grp" data-cid="${esc(c.id)}"><label>Name<input data-k="name" value="${esc(c.name)}" required></label><label>Anschrift<textarea data-k="addr">${esc(c.addr)}</textarea></label><label>Satz (€ je UStd.)<input data-k="rate" type="number" step="0.01" value="${esc(c.rate)}"></label><div class="row" style="align-self:end">${S.entries.some(e=>e.client===c.id)?'<span class="muted">wird verwendet</span>':`<button type="button" class="btn sm" data-act="delClient" data-id="${esc(c.id)}" data-confirm>Entfernen</button>`}</div></div>`).join('')}</div>
   <div class="row"><button type="button" class="btn" data-act="addClient">Auftraggeber hinzufügen</button><button class="btn pri">Speichern</button></div></form>
   ${USER?`<section class="card"><h2>Konto</h2><p class="muted">Angemeldet als ${esc(USER.email)}. Deine Daten werden in der Cloud gespeichert und auf allen Geräten synchronisiert.</p><button class="btn" data-act="logout">Abmelden</button></section>`:''}
@@ -246,14 +246,17 @@ function vSettings(){
 function render(){renderHead();$('#view').innerHTML={stunden:vStunden,rechnungen:vRechnungen,schueler:vSchueler,akquise:vAkquise,einstellungen:vSettings}[tab()]();if(MODAL)renderModal()}
 
 /* Rechnungen */
-function nextNr(){let n=S.me.nextNr||'1';const y=today().slice(0,4);if(/^\d{4}-/.test(n)&&n.slice(0,4)!==y)n=y+'-001';return n}
-function incNr(n){const m=n.match(/^(.*?)(\d+)$/);return m?m[1]+String(+m[2]+1).padStart(m[2].length,'0'):n+'-2'}
+function nextNr(){let n=S.me.nextNr||'1';const y=today().slice(0,4);if(/^\d{4}-/.test(n)&&n.slice(0,4)!==y)n=y+'-001';
+  const m=n.match(/^(.*?)(\d+)$/);if(!m)return n;
+  const re=new RegExp('^'+m[1].replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(\\d+)$');
+  const used=S.invoices.map(i=>(i.nr.match(re)||[])[1]).filter(Boolean).map(Number);
+  return used.length?m[1]+String(Math.max(...used)+1).padStart(m[2].length,'0'):n}
 function bill(cid,ym){
   const es=S.entries.filter(e=>!e.inv&&e.client===cid&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));
   if(!es.length){toast('Keine offenen Stunden gefunden');return}
   const c=client(cid),nr=nextNr(),id=uid();
   const inv={id,nr,date:today(),client:{name:c.name,addr:c.addr},from:{...S.me},items:es.map(e=>({text:lineText(e),ue:+e.ue,rate:+e.rate})),period:[es[0].date,es[es.length-1].date],total:Math.round(sum(es,e=>e.ue*e.rate)*100)/100,paid:false};
-  es.forEach(e=>e.inv=id);S.invoices.push(inv);S.me.nextNr=incNr(nr);MODAL=id;commit('Rechnung '+nr+' erstellt');
+  es.forEach(e=>e.inv=id);S.invoices.push(inv);MODAL=id;commit('Rechnung '+nr+' erstellt');
 }
 function renderModal(){
   const i=S.invoices.find(x=>x.id===MODAL);if(!i){closeModal();return}
@@ -331,7 +334,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
   if(b.hasAttribute('data-confirm')&&!b.classList.contains('armed')){b.classList.add('armed');b.dataset.lbl=b.textContent;b.textContent='Sicher?';setTimeout(()=>{if(b.isConnected){b.classList.remove('armed');b.textContent=b.dataset.lbl}},3000);return}
   act[b.dataset.act]&&act[b.dataset.act](b)});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
-  if(f.id==='f-entry'){S.entries.push({id:uid(),date:d.date,client:d.client,student:d.student.trim(),g:d.g,leistung:d.leistung.trim(),ue:+d.ue,rate:+d.rate,inv:null});
+  if(f.id==='f-entry'){const bm=S.entries.find(en=>en.inv&&en.client===d.client&&en.date.slice(0,7)===d.date.slice(0,7)),bi=bm&&S.invoices.find(x=>x.id===bm.inv);
+    if(bm){toast('Für '+MON[+d.date.slice(5,7)-1]+' '+d.date.slice(0,4)+' gibt es schon die Rechnung '+(bi?bi.nr:'')+'. Storniere sie zuerst unter Rechnungen, dann kannst du Stunden nachtragen.',6000);return}
+    S.entries.push({id:uid(),date:d.date,client:d.client,student:d.student.trim(),g:d.g,leistung:d.leistung.trim(),ue:+d.ue,rate:+d.rate,inv:null});
     if(d.student.trim()&&!S.students.some(s=>s.name===d.student.trim()))S.students.push({id:uid(),name:d.student.trim(),kurs:client(d.client).name,exam:'',focus:'',next:''});
     S.last={client:d.client,leistung:d.leistung.trim(),ue:+d.ue};commit('Eingetragen: '+num(d.ue)+' UStd.')}
   if(f.id==='f-student'){S.students.push({id:uid(),name:d.name.trim(),kurs:d.kurs.trim(),exam:d.exam,focus:d.focus.trim(),next:d.next});commit('Hinzugefügt')}
