@@ -22,6 +22,8 @@ h1{font-size:clamp(30px,5vw,44px)}h2{font-size:22px;margin-bottom:14px}h3{font-s
 .wrap{max-width:1180px;margin:0 auto}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .top p{margin:6px 0 0;color:#cfe3df}
+#logout{font:inherit;font-size:13px;color:#fff;border:1px solid rgba(255,255,255,.45);cursor:pointer;min-height:32px;padding:5px 14px}
+#logout:hover{background:rgba(255,255,255,.25)}
 .pill{font-size:13px;padding:5px 12px;border-radius:99px;background:rgba(255,255,255,.12);color:#dfe5f5;white-space:nowrap}
 .head{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;margin-top:26px;align-items:end}
 .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -90,7 +92,7 @@ pre,.scroll{overflow-x:auto}
 </head>
 <body>
 <header class="band"><div class="wrap">
-  <div class="top"><div><h1>Dozenten-Cockpit</h1><p>NTG-Nachhilfe und Dozententätigkeit · Stunden, Rechnungen, Schüler, Akquise</p></div><span class="pill" id="status">Lädt…</span></div>
+  <div class="top"><div><h1>Dozenten-Cockpit</h1><p>NTG-Nachhilfe und Dozententätigkeit · Stunden, Rechnungen, Schüler, Akquise</p></div><div class="row"><span class="pill" id="status">Lädt…</span><button class="pill" id="logout" data-act="logout" hidden>Abmelden</button></div></div>
   <div class="head"><div class="kpis" id="kpis"></div><div><div class="bars" id="bars"></div><div class="barcap">Unterrichtsstunden pro Monat, letzte 6 Monate</div></div></div>
 </div></header>
 <nav id="nav"><a href="#stunden">Stunden</a><a href="#rechnungen">Rechnungen</a><a href="#schueler">Schüler</a><a href="#akquise">Akquise</a><a href="#einstellungen">Einstellungen</a></nav>
@@ -348,7 +350,7 @@ window.addEventListener('hashchange',()=>{try{localStorage.setItem('dz-tab',tab(
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MODAL)closeModal()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&USER&&!CT)pull()});
 render();
-if(SB){status('Anmeldung prüfen…');SB.auth.onAuthStateChange((ev,sess)=>{USER=sess?sess.user:null;if(USER){hideAuth();setTimeout(pull,0);if(MODAL||tab()==='einstellungen')render()}else if(!LOCAL_ONLY)showAuth()})}
+if(SB){status('Anmeldung prüfen…');SB.auth.onAuthStateChange((ev,sess)=>{USER=sess?sess.user:null;$('#logout').hidden=!USER;if(USER){hideAuth();setTimeout(pull,0);if(MODAL||tab()==='einstellungen')render()}else if(!LOCAL_ONLY)showAuth()})}
 else status('Lokal gespeichert (Cloud nicht verfügbar)');
 }
 </script></body></html>
