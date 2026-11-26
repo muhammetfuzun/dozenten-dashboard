@@ -384,7 +384,8 @@ function renderModal(){
 function closeModal(){MODAL=null;$('#modal').classList.remove('show');$('#modal').innerHTML=''}
 let pdfP=null;
 function loadPdf(){if(window.jspdf)return Promise.resolve();return pdfP||(pdfP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=()=>{pdfP=null;rej()};document.head.appendChild(s)}))}
-const periodShort=i=>i.period[0]===i.period[1]?de(i.period[0]):(i.period[0].slice(0,4)===i.period[1].slice(0,4)?de(i.period[0]).slice(0,6):de(i.period[0]))+' – '+de(i.period[1]);
+const monthBounds=i=>{const a=i.period[0].slice(0,7),b=i.period[1].slice(0,7),[y,m]=b.split('-').map(Number);return[a+'-01',b+'-'+pad(new Date(y,m,0).getDate())]};
+const periodShort=i=>{const[a,b]=monthBounds(i);return(a.slice(0,4)===b.slice(0,4)?de(a).slice(0,6):de(a))+' – '+de(b)};
 const fmtIban=s=>(s||'—').replace(/\s+/g,'').replace(/(.{4})/g,'$1 ').trim();
 function itemParts(it){
   if(it.leistung)return{main:it.leistung,sub:[de(it.date),it.student?(it.g==='w'?'Schülerin: ':'Schüler: ')+it.student:''].filter(Boolean).join(' · ')};
